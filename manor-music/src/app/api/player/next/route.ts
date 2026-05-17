@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { broadcast } from '@/lib/realtime';
+import { pickStationTrack } from '@/lib/station-picker';
 
 // The player calls this when it needs the next track.
 // 1) Mark whatever was previously playing as ended.
 // 2) Promote the next pending queue item (lowest position) to "playing".
+//    If no queue item exists, ask the auto-DJ to pick from the active station,
+//    insert it as a STATION queue item, and play that.
 // 3) Log a Play row for history.
-// If the queue is empty, the response is null and the player should fall back
-// to its active station (auto-DJ). Station logic lives in a follow-up endpoint.
 
 function authed(req: NextRequest) {
   const key = req.headers.get('x-player-key');
@@ -26,15 +27,32 @@ export async function POST(req: NextRequest) {
     data: { endedAt: new Date() },
   });
 
-  const next = await db.queueItem.findFirst({
+  let next = await db.queueItem.findFirst({
     where: { startedAt: null, removedAt: null },
     orderBy: { position: 'asc' },
     include: { song: true },
   });
 
   if (!next) {
-    await broadcast({ type: 'now-playing', songId: null });
-    return NextResponse.json({ track: null });
+    // Auto-DJ: pull from the active station, materialise into the queue so
+    // the rest of the system (UI, reports, skip button) treats it normally.
+    const stationSong = await pickStationTrack();
+    if (!stationSong) {
+      await broadcast({ type: 'now-playing', songId: null });
+      return NextResponse.json({ track: null });
+    }
+    const last = await db.queueItem.findFirst({
+      orderBy: { position: 'desc' },
+      select: { position: true },
+    });
+    next = await db.queueItem.create({
+      data: {
+        songId: stationSong.id,
+        source: 'STATION',
+        position: (last?.position ?? 0) + 1,
+      },
+      include: { song: true },
+    });
   }
 
   const now = new Date();

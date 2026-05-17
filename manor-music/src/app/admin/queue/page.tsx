@@ -3,6 +3,7 @@ import { isAdmin } from '@/lib/auth-admin';
 import { getCurrentQueue, getNowPlaying } from '@/lib/queue';
 import { BrandHeader } from '@/components/Brand';
 import { QueueRow } from './QueueRow';
+import { AutoRefresh } from './AutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,7 @@ export default async function AdminQueuePage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-24">
+      <AutoRefresh />
       <BrandHeader subtitle="Queue control" />
 
       <section className="card mb-4">

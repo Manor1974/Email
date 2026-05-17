@@ -7,6 +7,23 @@ matrix (for music videos) and 3.5mm/USB-DAC to your mixer (for audio).
 This is the "appliance" setup: the PC boots straight into the player and the
 staff DJ console, with nothing else running.
 
+## TL;DR — one-script install
+
+After the Windows out-of-box setup below, you can replace steps 3–6 with the
+included installer script. From an elevated PowerShell prompt:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+irm https://raw.githubusercontent.com/manor1974/email/main/manor-music/scripts/install-windows.ps1 | iex
+```
+
+It installs Node + Git + mpv + nssm + Chrome via winget, clones the repo,
+prompts for your Vercel URL + PLAYER_API_KEY, installs deps, registers the
+player as a Windows service, and drops the kiosk-mode shortcut into Startup.
+
+If you'd rather see each step (recommended the first time), follow the
+manual sections below.
+
 ## 1. Out-of-box Windows setup
 
 1. First boot: pick the local-account option (no Microsoft account). Name it

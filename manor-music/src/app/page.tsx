@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { BrandHeader } from '@/components/Brand';
+import { LiveQueue } from '@/components/LiveQueue';
 import { currentCustomerId } from '@/lib/session';
 import { db } from '@/lib/db';
 import { getNowPlaying, getCurrentQueue } from '@/lib/queue';
@@ -17,18 +18,6 @@ export default async function Home() {
     <main className="mx-auto max-w-md px-4 pb-24">
       <BrandHeader subtitle="Pick the next song" />
 
-      <section className="card mb-4">
-        <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-1">Now playing</div>
-        {nowPlaying ? (
-          <div>
-            <div className="text-lg font-semibold text-manor-cream">{nowPlaying.song.title}</div>
-            <div className="text-sm text-manor-cream/70">{nowPlaying.song.artist}</div>
-          </div>
-        ) : (
-          <div className="text-manor-cream/50">Nothing playing right now.</div>
-        )}
-      </section>
-
       <Link href="/search" className="btn-primary w-full mb-3 text-lg">
         Search the music
       </Link>
@@ -43,29 +32,18 @@ export default async function Home() {
         </Link>
       )}
 
-      <section className="card">
-        <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-2">
-          Up next ({queue.length})
-        </div>
-        {queue.length === 0 ? (
-          <div className="text-manor-cream/50 text-sm">Queue is empty.</div>
-        ) : (
-          <ol className="space-y-3">
-            {queue.slice(0, 10).map((item, i) => (
-              <li key={item.id} className="flex items-center gap-3">
-                <div className="text-manor-teal font-bold w-6 text-right">{i + 1}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-manor-cream truncate">{item.song.title}</div>
-                  <div className="text-xs text-manor-cream/60 truncate">
-                    {item.song.artist}
-                    {item.customer?.displayName ? ` · added by ${item.customer.displayName}` : ''}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      <LiveQueue
+        initial={{
+          nowPlaying: nowPlaying
+            ? { song: { id: nowPlaying.song.id, title: nowPlaying.song.title, artist: nowPlaying.song.artist } }
+            : null,
+          queue: queue.map((q) => ({
+            id: q.id,
+            song: { title: q.song.title, artist: q.song.artist },
+            customer: q.customer,
+          })),
+        }}
+      />
     </main>
   );
 }

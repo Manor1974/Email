@@ -72,6 +72,17 @@ export function StaffConsole({ genres }: { genres: string[] }) {
     await fetch('/api/admin/queue/skip', { method: 'POST' });
   }
 
+  async function block(songId: string, title: string) {
+    const reason = prompt(`Block "${title}"? Optional reason:`);
+    if (reason === null) return;
+    await fetch(`/api/admin/songs/${songId}/block`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    setResults((r) => r.filter((s) => s.id !== songId));
+  }
+
   return (
     <div className="grid md:grid-cols-[280px_1fr] gap-4">
       <aside className="space-y-4">
@@ -140,6 +151,9 @@ export function StaffConsole({ genres }: { genres: string[] }) {
               <button onClick={() => queue(s.id, false)} className="btn-primary px-3 py-2 text-sm">Queue</button>
               <button onClick={() => queue(s.id, true)} className="btn-ghost px-3 py-2 text-sm" title="Background station (skipped if customer queue fills)">
                 Station
+              </button>
+              <button onClick={() => block(s.id, s.title)} className="btn-danger px-3 py-2 text-sm" title="Hide from customers and stations">
+                Block
               </button>
             </li>
           ))}

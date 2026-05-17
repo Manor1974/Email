@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#161B22"/>
+      <stop offset="100%" stop-color="#0E1116"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Solid teal background — looks best as a maskable home-screen icon -->
+  <rect width="512" height="512" fill="#38B6A6"/>
+
+  <!-- Inner dark panel with rounded corners (the "safe zone" for maskable) -->
+  <rect x="56" y="56" width="400" height="400" rx="80" ry="80" fill="url(#bg)"/>
+
+  <!-- "ML" monogram -->
+  <text x="256" y="320" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-weight="900" font-size="220" fill="#38B6A6" text-anchor="middle"
+        letter-spacing="-10">ML</text>
+
+  <!-- Gold accent underline -->
+  <rect x="176" y="360" width="160" height="10" rx="5" fill="#E0B341"/>
+</svg>

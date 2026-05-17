@@ -66,6 +66,12 @@ export default async function ReportsPage() {
     <main className="mx-auto max-w-5xl px-4 pb-24">
       <BrandHeader subtitle="Reports" />
 
+      <div className="flex justify-end gap-2 mb-4">
+        <a href="/api/admin/reports/export?days=7" className="btn-ghost px-3 py-2 text-sm">Export 7-day CSV</a>
+        <a href="/api/admin/reports/export?days=30" className="btn-ghost px-3 py-2 text-sm">Export 30-day CSV</a>
+        <a href="/api/admin/reports/export?days=90" className="btn-ghost px-3 py-2 text-sm">Export 90-day CSV</a>
+      </div>
+
       <section className="grid md:grid-cols-2 gap-4">
         <TopList title="Top songs — last 7 days" items={top7} />
         <TopList title="Top songs — last 30 days" items={top30} />

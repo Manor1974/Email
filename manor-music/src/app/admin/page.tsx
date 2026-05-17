@@ -49,7 +49,9 @@ export default async function AdminHome() {
         <Link href="/admin/stations" className="card hover:border-manor-teal">Stations &amp; auto-DJ</Link>
         <Link href="/admin/reports" className="card hover:border-manor-teal">Reports</Link>
         <Link href="/admin/settings" className="card hover:border-manor-teal">Settings</Link>
+        <Link href="/admin/qr" className="card hover:border-manor-teal">Print lane QR cards</Link>
         <Link href="/staff" className="card hover:border-manor-teal">Staff DJ console</Link>
+        <Link href="/display" target="_blank" className="card hover:border-manor-teal">Open TV display</Link>
       </nav>
     </main>
   );

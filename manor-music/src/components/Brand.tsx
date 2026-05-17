@@ -1,10 +1,10 @@
+import Image from 'next/image';
+
 export function BrandHeader({ subtitle }: { subtitle?: string }) {
   return (
     <header className="flex flex-col items-center gap-1 py-6">
       <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-lg bg-manor-teal flex items-center justify-center">
-          <span className="text-manor-ink font-black text-lg">M</span>
-        </div>
+        <Image src="/icons/icon-192.png" alt="" width={40} height={40} className="rounded-lg" priority />
         <div className="text-2xl font-black tracking-wide text-manor-cream">
           MANOR <span className="text-manor-teal">LANES</span>
         </div>

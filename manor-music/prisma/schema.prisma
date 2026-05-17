@@ -1,0 +1,167 @@
+// Manor Lanes Jukebox — data model
+//
+// Two key relationships worth noting up front:
+//   1. Songs link clean<->explicit versions via `cleanPairId`, so the
+//      scheduler can swap them without changing the queue contract.
+//   2. Plays are append-only history; QueueItems are the live working set.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Song {
+  id           String   @id @default(cuid())
+  filePath     String   @unique
+  videoPath    String?
+  title        String
+  artist       String
+  album        String?
+  durationSec  Int
+  isExplicit   Boolean  @default(false)
+  cleanPairId  String?
+  cleanPair    Song?    @relation("CleanExplicitPair", fields: [cleanPairId], references: [id])
+  pairOf       Song[]   @relation("CleanExplicitPair")
+
+  genre        String?
+  bpm          Int?
+  year         Int?
+  energy       Float?
+  mood         String?
+
+  blockedAt     DateTime?
+  blockedReason String?
+
+  addedAt      DateTime @default(now())
+  lastPlayedAt DateTime?
+
+  queueItems   QueueItem[]
+  plays        Play[]
+  fulfilledRequests SongRequest[] @relation("FulfilledBy")
+
+  @@index([artist])
+  @@index([title])
+  @@index([genre])
+  @@index([blockedAt])
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  displayName  String?
+  bannedAt     DateTime?
+  banReason    String?
+  createdAt    DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+
+  queueItems   QueueItem[]
+  plays        Play[]
+  requests     SongRequest[]
+  smsCodes     SmsCode[]
+}
+
+model SmsCode {
+  id         String   @id @default(cuid())
+  phone      String
+  code       String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([phone, code])
+}
+
+model QueueItem {
+  id          String   @id @default(cuid())
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id])
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  source      QueueSource
+  position    Int
+  addedAt     DateTime @default(now())
+  startedAt   DateTime?
+  endedAt     DateTime?
+  skippedAt   DateTime?
+  removedAt   DateTime?
+  removedBy   String?
+
+  @@index([position])
+  @@index([startedAt])
+}
+
+enum QueueSource {
+  CUSTOMER
+  STAFF
+  STATION
+}
+
+model Play {
+  id          String   @id @default(cuid())
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id])
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  source      QueueSource
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  skipped     Boolean  @default(false)
+
+  @@index([startedAt])
+  @@index([songId, startedAt])
+}
+
+model SongRequest {
+  id             String   @id @default(cuid())
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id])
+  artist         String
+  title          String
+  notes          String?
+  fulfilledSongId String?
+  fulfilledSong   Song?   @relation("FulfilledBy", fields: [fulfilledSongId], references: [id])
+  fulfilledAt    DateTime?
+  notifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([fulfilledAt])
+}
+
+// Per-day windows when explicit lyrics are allowed.
+// Day-of-week: 0 = Sunday, 6 = Saturday.
+// startMinute/endMinute are minutes since midnight.
+model ExplicitWindow {
+  id          String   @id @default(cuid())
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+  enabled     Boolean  @default(true)
+}
+
+// Curated stations for the auto-DJ fallback.
+// `filter` is a JSON object: { genres?: string[], minYear?, maxYear?, minBpm?, maxBpm?, moods?: string[] }
+model Station {
+  id          String   @id @default(cuid())
+  name        String
+  filter      Json
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Settings {
+  id                     String  @id @default("singleton")
+  maxSongsPerCustomer    Int     @default(3)
+  songCooldownHours      Int     @default(4)
+  artistCooldownMinutes  Int     @default(45)
+  customerBlendRatio     Int     @default(1)
+  activeStationId        String?
+  cleanModeOverride      String  @default("AUTO") // AUTO | FORCE_CLEAN | FORCE_EXPLICIT
+}

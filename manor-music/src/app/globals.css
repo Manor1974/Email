@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background-color: #0E1116;
+  color: #F2E9D8;
+  min-height: 100dvh;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-3 font-semibold
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-manor-teal text-manor-ink hover:bg-manor-tealDark;
+  }
+  .btn-ghost {
+    @apply btn bg-manor-panel text-manor-cream hover:bg-manor-line border border-manor-line;
+  }
+  .btn-danger {
+    @apply btn bg-manor-danger text-white hover:opacity-90;
+  }
+  .input {
+    @apply w-full rounded-xl bg-manor-panel border border-manor-line text-manor-cream
+           px-4 py-3 placeholder:text-manor-cream/40
+           focus:outline-none focus:border-manor-teal;
+  }
+  .card {
+    @apply rounded-2xl bg-manor-panel border border-manor-line p-4;
+  }
+}

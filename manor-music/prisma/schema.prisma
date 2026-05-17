@@ -84,6 +84,7 @@ model QueueItem {
   customerId  String?
   customer    Customer? @relation(fields: [customerId], references: [id])
   source      QueueSource
+  location    String?
   position    Int
   addedAt     DateTime @default(now())
   startedAt   DateTime?
@@ -94,6 +95,7 @@ model QueueItem {
 
   @@index([position])
   @@index([startedAt])
+  @@index([location])
 }
 
 enum QueueSource {
@@ -109,12 +111,14 @@ model Play {
   customerId  String?
   customer    Customer? @relation(fields: [customerId], references: [id])
   source      QueueSource
+  location    String?
   startedAt   DateTime @default(now())
   endedAt     DateTime?
   skipped     Boolean  @default(false)
 
   @@index([startedAt])
   @@index([songId, startedAt])
+  @@index([location])
 }
 
 model SongRequest {

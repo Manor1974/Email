@@ -13,6 +13,7 @@ interface AddOptions {
   songId: string;
   customerId?: string | null;
   source: QueueSource;
+  location?: string | null;
   bypassRules?: boolean; // staff override
 }
 
@@ -103,6 +104,7 @@ export async function addToQueue(opts: AddOptions) {
       songId: song.id,
       customerId: opts.customerId ?? null,
       source: opts.source,
+      location: opts.location ?? null,
       position,
     },
   });
@@ -134,4 +136,10 @@ export async function getNowPlaying() {
     orderBy: { startedAt: 'desc' },
     include: { song: true, customer: { select: { displayName: true } } },
   });
+}
+
+// "Brian @ Bar" style display name for queue/admin UI.
+export function attribution(customerName: string | null, location: string | null): string | null {
+  if (customerName && location) return `${customerName} @ ${location}`;
+  return customerName ?? location ?? null;
 }

@@ -50,6 +50,7 @@ export default async function AdminQueuePage() {
                 artist={item.song.artist}
                 source={item.source}
                 addedBy={item.customer?.displayName ?? null}
+                location={item.location}
               />
             ))}
           </ol>

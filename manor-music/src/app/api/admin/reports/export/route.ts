@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  const header = ['playedAt', 'title', 'artist', 'album', 'genre', 'year', 'source', 'skipped', 'requestedBy', 'requestedByPhone'];
+  const header = ['playedAt', 'title', 'artist', 'album', 'genre', 'year', 'source', 'location', 'skipped', 'requestedBy', 'requestedByPhone'];
   const rows = plays.map((p) => [
     p.startedAt.toISOString(),
     p.song.title,
@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     p.song.genre ?? '',
     p.song.year ?? '',
     p.source,
+    p.location ?? '',
     p.skipped ? 'yes' : 'no',
     p.customer?.displayName ?? '',
     p.customer?.phone ?? '',

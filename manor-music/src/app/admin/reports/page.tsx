@@ -37,6 +37,42 @@ async function heatmap(days: number) {
   return grid;
 }
 
+async function plays_by_location(days: number) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const rows = await db.play.groupBy({
+    by: ['location'],
+    where: { startedAt: { gte: since }, location: { not: null } },
+    _count: { location: true },
+    orderBy: { _count: { location: 'desc' } },
+  });
+  return rows.map((r) => ({ location: r.location!, count: r._count.location }));
+}
+
+async function topSongsByLocation(days: number) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const plays = await db.play.findMany({
+    where: { startedAt: { gte: since }, location: { not: null }, skipped: false },
+    select: { location: true, song: { select: { title: true, artist: true } } },
+  });
+  // For each location, count top song.
+  const byLocation = new Map<string, Map<string, { title: string; artist: string; count: number }>>();
+  for (const p of plays) {
+    if (!p.location) continue;
+    const songKey = `${p.song.artist}::${p.song.title}`;
+    const inner = byLocation.get(p.location) ?? new Map();
+    const existing = inner.get(songKey);
+    if (existing) existing.count += 1;
+    else inner.set(songKey, { title: p.song.title, artist: p.song.artist, count: 1 });
+    byLocation.set(p.location, inner);
+  }
+  return [...byLocation.entries()]
+    .map(([location, songs]) => ({
+      location,
+      top: [...songs.values()].sort((a, b) => b.count - a.count).slice(0, 5),
+    }))
+    .sort((a, b) => b.top.reduce((s, t) => s + t.count, 0) - a.top.reduce((s, t) => s + t.count, 0));
+}
+
 async function mostRequestedUnfulfilled() {
   const rows = await db.songRequest.findMany({
     where: { fulfilledAt: null },
@@ -54,11 +90,13 @@ async function mostRequestedUnfulfilled() {
 
 export default async function ReportsPage() {
   if (!(await isAdmin())) redirect('/admin/login');
-  const [top7, top30, hm, reqs] = await Promise.all([
+  const [top7, top30, hm, reqs, byLoc, topByLoc] = await Promise.all([
     topSongs(7),
     topSongs(30),
     heatmap(30),
     mostRequestedUnfulfilled(),
+    plays_by_location(30),
+    topSongsByLocation(30),
   ]);
   const max = Math.max(1, ...hm.flat());
 
@@ -110,6 +148,48 @@ export default async function ReportsPage() {
           </table>
         </div>
       </section>
+
+      <section className="card mt-4">
+        <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-2">
+          Plays by zone (last 30 days)
+        </div>
+        {byLoc.length === 0 ? (
+          <div className="text-manor-cream/50 text-sm">No location-tagged plays yet.</div>
+        ) : (
+          <ol className="space-y-2">
+            {byLoc.map((row) => (
+              <li key={row.location} className="flex items-center gap-3">
+                <div className="text-manor-cream truncate flex-1">{row.location}</div>
+                <div className="text-manor-cream/70 text-sm">{row.count}</div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      {topByLoc.length > 0 && (
+        <section className="card mt-4">
+          <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-3">
+            Top songs by zone (last 30 days)
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            {topByLoc.map((z) => (
+              <div key={z.location}>
+                <div className="text-manor-teal font-semibold mb-1">{z.location}</div>
+                <ol className="space-y-1 text-sm">
+                  {z.top.map((s, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="text-manor-cream/50 w-6 text-right">×{s.count}</span>
+                      <span className="text-manor-cream truncate flex-1">{s.title}</span>
+                      <span className="text-manor-cream/60 truncate">{s.artist}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="card mt-4">
         <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-2">

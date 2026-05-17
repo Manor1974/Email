@@ -10,6 +10,7 @@ interface Props {
   artist: string;
   source: string;
   addedBy: string | null;
+  location: string | null;
 }
 
 export function QueueRow(props: Props) {
@@ -32,6 +33,11 @@ export function QueueRow(props: Props) {
         <div className="text-xs text-manor-cream/60 truncate">
           {props.artist}
           {props.addedBy ? ` · ${props.addedBy}` : ` · ${props.source.toLowerCase()}`}
+          {props.location ? (
+            <span className="ml-2 px-1.5 py-0.5 bg-manor-line rounded text-[10px] text-manor-teal">
+              {props.location}
+            </span>
+          ) : null}
         </div>
       </div>
       <button onClick={remove} disabled={busy} className="btn-danger px-3 py-2 text-sm">

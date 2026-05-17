@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { addToQueue, getCurrentQueue, getNowPlaying, QueueError } from '@/lib/queue';
 import { currentCustomerId } from '@/lib/session';
+import { getLocation } from '@/lib/location';
 
 export async function GET() {
   const [queue, nowPlaying] = await Promise.all([getCurrentQueue(), getNowPlaying()]);
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
       songId: parsed.data.songId,
       customerId,
       source: 'CUSTOMER',
+      location: await getLocation(),
     });
     return NextResponse.json({ ok: true, queueItemId: item.id });
   } catch (e) {

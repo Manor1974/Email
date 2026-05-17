@@ -11,6 +11,7 @@ interface QueueRow {
   id: string;
   song: { title: string; artist: string };
   customer: { displayName: string | null } | null;
+  location?: string | null;
 }
 
 interface Initial {
@@ -73,7 +74,8 @@ export function LiveQueue({ initial }: { initial: Initial }) {
                   <div className="text-manor-cream truncate">{item.song.title}</div>
                   <div className="text-xs text-manor-cream/60 truncate">
                     {item.song.artist}
-                    {item.customer?.displayName ? ` · added by ${item.customer.displayName}` : ''}
+                    {item.customer?.displayName ? ` · ${item.customer.displayName}` : ''}
+                    {item.location ? ` @ ${item.location}` : ''}
                   </div>
                 </div>
               </li>

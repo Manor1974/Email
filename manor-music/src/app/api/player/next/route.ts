@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
         songId: next.songId,
         customerId: next.customerId,
         source: next.source,
+        location: next.location,
         startedAt: now,
       },
     }),

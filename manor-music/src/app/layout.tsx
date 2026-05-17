@@ -1,5 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
+import { LocationCapture } from '@/components/LocationCapture';
 
 export const metadata: Metadata = {
   title: 'Manor Lanes Jukebox',
@@ -31,7 +33,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <LocationCapture />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

@@ -150,6 +150,18 @@ model ExplicitWindow {
   enabled     Boolean  @default(true)
 }
 
+// Per-zone overrides for the explicit-lyrics rule.
+//   AUTO            — follow the global ExplicitWindow schedule
+//   FORCE_CLEAN     — never play explicit at this zone (e.g. volleyball courts)
+//   FORCE_EXPLICIT  — always allow explicit at this zone (e.g. bar, adults only)
+model ZoneOverride {
+  id        String @id @default(cuid())
+  zone      String @unique
+  mode      String // AUTO | FORCE_CLEAN | FORCE_EXPLICIT
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Curated stations for the auto-DJ fallback.
 // `filter` is a JSON object: { genres?: string[], minYear?, maxYear?, minBpm?, maxBpm?, moods?: string[] }
 model Station {
@@ -169,4 +181,6 @@ model Settings {
   customerBlendRatio     Int     @default(1)
   activeStationId        String?
   cleanModeOverride      String  @default("AUTO") // AUTO | FORCE_CLEAN | FORCE_EXPLICIT
+  playbackState          String  @default("PLAYING") // PLAYING | PAUSED
+  playbackVolume         Int     @default(80)
 }

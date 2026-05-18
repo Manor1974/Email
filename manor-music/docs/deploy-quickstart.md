@@ -67,8 +67,11 @@ Visit your Vercel URL on your phone:
 - Tap **Sign in to queue songs** → enter your phone → you should receive a code via Twilio
 - Verify the code → you're signed in
 - Visit `/admin/login` → enter your PIN → you should land on the admin dashboard
+- Click **System health check** — every row should be green or gold. The
+  "Player" row will be red until the mini PC is online; that's expected
+  until Tuesday.
 
-If all four work, your Vercel + Neon + Pusher + Twilio chain is healthy.
+If those work, your Vercel + Neon + Pusher + Twilio chain is healthy.
 
 ## 6. When the mini PC arrives
 

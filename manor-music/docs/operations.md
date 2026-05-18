@@ -43,6 +43,56 @@ Override modes:
   planning specials, staffing, etc.
 - **Most-requested unfulfilled** — the highest-leverage music to buy next.
 
+## Per-zone explicit-lyrics overrides
+
+`/admin/schedule` → "Per-zone overrides" section. Layer on top of the global
+schedule:
+
+- **Bar** — `Always allow explicit` (adults only)
+- **Volleyball Court 1–4** — `Always clean` (families)
+- **Lane 1–16** — leave unset; follows the global Fri/Sat 9pm–2am schedule
+
+When a customer at `Bar` queues a song, the rules check the zone override
+first, then fall back to global. So the same explicit track gets the explicit
+audio when queued from the bar and the clean version when queued from a
+volleyball court — at the same instant.
+
+## Playback control (pause / volume / skip)
+
+`/admin/playback` from a phone or tablet:
+
+- Big pause/play button — stops the current track in place (doesn't lose the
+  queue).
+- Skip — ends the current track and advances.
+- Volume slider — applies live via mpv IPC, changes audible within ~1 second.
+
+Use cases:
+- Pause for an announcement, resume after.
+- Slap volume to 30 during last call.
+- Skip the song someone queued by mistake.
+
+## Customer self-service
+
+Signed-in customers can hit `/my-queue` (or tap "My picks" on the home page) to:
+- See their pending songs and their global queue position.
+- Cancel any song they queued before it starts playing.
+- See their last 10 plays.
+
+This cuts down on "can you remove my song?" asks at the bar.
+
+## Pre-shift health check
+
+`/admin/health` runs through everything in one screen:
+
+- Database connectivity
+- Library size
+- Settings + active station
+- Player heartbeat freshness
+- Twilio + Pusher credentials present
+
+Refresh-on-demand, with an 8-second auto-poll. Run this before opening doors
+to catch a dead player or missing config in 5 seconds.
+
 ## Common issues
 
 | Symptom | Fix |

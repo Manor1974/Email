@@ -34,8 +34,13 @@ export default async function Home() {
       </Link>
 
       {customer ? (
-        <div className="text-center text-sm text-manor-cream/60 mb-4">
-          Signed in as <span className="text-manor-cream">{customer.displayName ?? customer.phone}</span>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="text-sm text-manor-cream/60">
+            Signed in as <span className="text-manor-cream">{customer.displayName ?? customer.phone}</span>
+          </div>
+          <Link href="/my-queue" className="text-sm text-manor-teal underline">
+            My picks
+          </Link>
         </div>
       ) : (
         <Link href="/auth" className="btn-ghost w-full mb-4">

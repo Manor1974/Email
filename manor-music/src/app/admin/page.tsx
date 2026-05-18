@@ -42,6 +42,10 @@ export default async function AdminHome() {
       </section>
 
       <nav className="grid grid-cols-2 gap-3">
+        <Link href="/admin/health" className="card hover:border-manor-teal col-span-2 text-center">
+          System health check
+        </Link>
+        <Link href="/admin/playback" className="card hover:border-manor-teal">Playback (pause/volume)</Link>
         <Link href="/admin/queue" className="card hover:border-manor-teal">Queue control</Link>
         <Link href="/admin/blocklist" className="card hover:border-manor-teal">Blocklist</Link>
         <Link href="/admin/schedule" className="card hover:border-manor-teal">Explicit schedule</Link>

@@ -49,6 +49,16 @@ function authed(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  // Don't advance the queue while paused — the player will retry once the
+  // state flips back to PLAYING.
+  const settings = await db.settings.findUnique({
+    where: { id: 'singleton' },
+    select: { playbackState: true },
+  });
+  if (settings?.playbackState === 'PAUSED') {
+    return NextResponse.json({ track: null, paused: true });
+  }
+
   await db.queueItem.updateMany({
     where: { startedAt: { not: null }, endedAt: null },
     data: { endedAt: new Date() },

@@ -20,7 +20,7 @@ interface AddOptions {
 // Resolve the right version (clean or explicit) for the song the user picked.
 // Customers always pick by title; under the hood we may swap to the clean pair
 // if explicit isn't currently allowed.
-async function resolveVersion(songId: string): Promise<Song> {
+async function resolveVersion(songId: string, location: string | null): Promise<Song> {
   const song = await db.song.findUnique({
     where: { id: songId },
     include: { cleanPair: true, pairOf: true },
@@ -29,7 +29,7 @@ async function resolveVersion(songId: string): Promise<Song> {
   if (song.blockedAt) throw new QueueError('BLOCKED', 'This song has been blocked');
 
   if (!song.isExplicit) return song;
-  if (await explicitAllowed()) return song;
+  if (await explicitAllowed(new Date(), location)) return song;
 
   // Need the clean counterpart.
   const clean = song.cleanPair ?? (song.pairOf?.find((s) => !s.isExplicit) ?? null);
@@ -48,7 +48,7 @@ export async function addToQueue(opts: AddOptions) {
     id: 'singleton',
   };
 
-  const song = await resolveVersion(opts.songId);
+  const song = await resolveVersion(opts.songId, opts.location ?? null);
 
   if (!opts.bypassRules) {
     if (opts.customerId) {

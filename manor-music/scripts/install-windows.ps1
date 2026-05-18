@@ -17,6 +17,8 @@
 param(
     [string]$ServerUrl,
     [string]$PlayerApiKey,
+    [string]$DatabaseUrl,
+    [string]$LibraryPath = 'D:\library',
     [string]$InstallDir = 'C:\manor-music',
     [string]$RepoUrl = 'https://github.com/manor1974/email.git',
     [string]$Branch = 'main'
@@ -70,11 +72,17 @@ if (-not (Test-Path $AppDir)) { throw "Expected $AppDir not found after clone" }
 
 Step 'Configuring .env'
 $envFile = Join-Path $AppDir '.env'
-if (-not $ServerUrl)     { $ServerUrl     = Read-Host 'SERVER_URL (your Vercel production URL, e.g. https://manor-jukebox.vercel.app)' }
-if (-not $PlayerApiKey)  { $PlayerApiKey  = Read-Host 'PLAYER_API_KEY (must match the value set in Vercel)' }
+if (-not $ServerUrl)    { $ServerUrl    = Read-Host 'SERVER_URL (your Vercel production URL, e.g. https://manor-jukebox.vercel.app)' }
+if (-not $PlayerApiKey) { $PlayerApiKey = Read-Host 'PLAYER_API_KEY (must match the value set in Vercel)' }
+if (-not $DatabaseUrl)  { $DatabaseUrl  = Read-Host 'DATABASE_URL (Neon pooled connection string)' }
+if (-not (Test-Path $LibraryPath)) {
+    New-Item -ItemType Directory -Path $LibraryPath -Force | Out-Null
+}
 @"
 SERVER_URL=$ServerUrl
 PLAYER_API_KEY=$PlayerApiKey
+DATABASE_URL=$DatabaseUrl
+LIBRARY_PATH=$LibraryPath
 "@ | Out-File -FilePath $envFile -Encoding utf8 -Force
 
 Step 'Installing npm dependencies (this takes a few minutes the first time)'
@@ -82,25 +90,30 @@ Push-Location $AppDir
 npm install --no-audit --no-fund
 Pop-Location
 
-Step 'Registering ManorPlayer Windows service'
+Step 'Registering Windows services (ManorPlayer + ManorWatcher)'
 $nodeExe = (Get-Command node).Source
 $tsxEntry = Join-Path $AppDir 'node_modules\tsx\dist\cli.mjs'
 $playerEntry = Join-Path $AppDir 'player\src\index.ts'
-
-# Recreate the service to pick up any path/env changes.
-& nssm stop    ManorPlayer 2>$null | Out-Null
-& nssm remove  ManorPlayer confirm 2>$null | Out-Null
-& nssm install ManorPlayer $nodeExe "`"$tsxEntry`" `"$playerEntry`""
-& nssm set     ManorPlayer AppDirectory $AppDir
-& nssm set     ManorPlayer AppEnvironmentExtra "SERVER_URL=$ServerUrl" "PLAYER_API_KEY=$PlayerApiKey"
-& nssm set     ManorPlayer Start SERVICE_AUTO_START
-& nssm set     ManorPlayer AppStdout "C:\ProgramData\nssm\ManorPlayer-stdout.log"
-& nssm set     ManorPlayer AppStderr "C:\ProgramData\nssm\ManorPlayer-stderr.log"
-& nssm set     ManorPlayer AppRotateFiles 1
-& nssm set     ManorPlayer AppRotateBytes 10485760
+$watcherEntry = Join-Path $AppDir 'scanner\src\watch.ts'
 New-Item -ItemType Directory -Path 'C:\ProgramData\nssm' -Force | Out-Null
-& nssm start   ManorPlayer
-Ok 'ManorPlayer service running'
+
+function Register-NssmService($name, $entry, $extraEnv) {
+    & nssm stop    $name 2>$null | Out-Null
+    & nssm remove  $name confirm 2>$null | Out-Null
+    & nssm install $name $nodeExe "`"$tsxEntry`" `"$entry`""
+    & nssm set     $name AppDirectory $AppDir
+    & nssm set     $name AppEnvironmentExtra $extraEnv
+    & nssm set     $name Start SERVICE_AUTO_START
+    & nssm set     $name AppStdout "C:\ProgramData\nssm\$name-stdout.log"
+    & nssm set     $name AppStderr "C:\ProgramData\nssm\$name-stderr.log"
+    & nssm set     $name AppRotateFiles 1
+    & nssm set     $name AppRotateBytes 10485760
+    & nssm start   $name
+    Ok "$name service running"
+}
+
+Register-NssmService 'ManorPlayer'  $playerEntry  @("SERVER_URL=$ServerUrl", "PLAYER_API_KEY=$PlayerApiKey")
+Register-NssmService 'ManorWatcher' $watcherEntry @("DATABASE_URL=$DatabaseUrl", "LIBRARY_PATH=$LibraryPath", "TWILIO_ACCOUNT_SID=$env:TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN=$env:TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER=$env:TWILIO_FROM_NUMBER")
 
 Step 'Creating kiosk-mode Chrome shortcut'
 $chromePath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"

@@ -2,6 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { broadcast } from '@/lib/realtime';
 import { pickStationTrack } from '@/lib/station-picker';
+import { sendSms } from '@/lib/sms';
+
+// Best-effort SMS to the customer whose song is now next up in the queue.
+// Runs after the response is sent so a slow Twilio call can't delay playback.
+async function notifyUpNext() {
+  const upNext = await db.queueItem.findFirst({
+    where: {
+      startedAt: null,
+      removedAt: null,
+      notifiedUpNextAt: null,
+      customerId: { not: null },
+    },
+    orderBy: { position: 'asc' },
+    include: { song: true, customer: true },
+  });
+  if (!upNext?.customer?.phone) return;
+
+  await db.queueItem.update({
+    where: { id: upNext.id },
+    data: { notifiedUpNextAt: new Date() },
+  });
+
+  try {
+    await sendSms(
+      upNext.customer.phone,
+      `Manor Lanes: your pick "${upNext.song.title}" by ${upNext.song.artist} is up next.`,
+    );
+  } catch (e) {
+    console.error('[up-next sms]', (e as Error).message);
+  }
+}
 
 // The player calls this when it needs the next track.
 // 1) Mark whatever was previously playing as ended.
@@ -71,6 +102,9 @@ export async function POST(req: NextRequest) {
   ]);
 
   await broadcast({ type: 'now-playing', songId: next.songId });
+
+  // Fire-and-forget; a slow Twilio call shouldn't delay playback.
+  notifyUpNext().catch((e) => console.error('[notifyUpNext]', e));
 
   return NextResponse.json({
     track: {

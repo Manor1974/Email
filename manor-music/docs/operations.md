@@ -6,10 +6,18 @@
 2. Drop new files into the library folder:
    - Audio: `D:\library\<Artist>\<Title>.mp3` (Promo Only's default layout works as-is).
    - Music videos: same folder, same base name, `.mp4`.
-3. Run the scanner: `npm run scan` from the project folder, or use the
-   desktop shortcut.
-4. Any open customer requests that match the new music get auto-fulfilled
-   and the customers receive an SMS.
+3. **No action required** — the `ManorWatcher` service auto-ingests new
+   files within ~3 seconds of the copy finishing. If a customer had
+   requested that song, they get an SMS the moment it's available.
+4. If you ever need to force a full re-scan (e.g. after restoring from a
+   backup), run `npm run scan` from the project folder.
+
+## Up-next SMS notifications
+
+When the currently-playing track ends and the next song in the queue starts,
+the customer who added that next track gets an SMS — so they can step away
+from the lanes/bar and not miss their pick. Each queue item is notified at
+most once.
 
 ## Blocking a song
 

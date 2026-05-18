@@ -47,9 +47,10 @@ export default async function AdminHome() {
         <Link href="/admin/schedule" className="card hover:border-manor-teal">Explicit schedule</Link>
         <Link href="/admin/requests" className="card hover:border-manor-teal">Requests inbox</Link>
         <Link href="/admin/stations" className="card hover:border-manor-teal">Stations &amp; auto-DJ</Link>
+        <Link href="/admin/customers" className="card hover:border-manor-teal">Customers</Link>
         <Link href="/admin/reports" className="card hover:border-manor-teal">Reports</Link>
         <Link href="/admin/settings" className="card hover:border-manor-teal">Settings</Link>
-        <Link href="/admin/qr" className="card hover:border-manor-teal">Print lane QR cards</Link>
+        <Link href="/admin/qr" className="card hover:border-manor-teal">Print zone QR cards</Link>
         <Link href="/staff" className="card hover:border-manor-teal">Staff DJ console</Link>
         <Link href="/display" target="_blank" className="card hover:border-manor-teal">Open TV display</Link>
       </nav>

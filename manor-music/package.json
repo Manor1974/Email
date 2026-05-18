@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "scan": "tsx scanner/src/scan.ts",
+    "scan:watch": "tsx scanner/src/watch.ts",
     "player": "tsx player/src/index.ts"
   },
   "prisma": {
@@ -22,6 +23,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "chokidar": "^5.0.0",
     "clsx": "^2.1.1",
     "music-metadata": "^10.5.0",
     "next": "14.2.18",

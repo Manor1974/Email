@@ -92,6 +92,7 @@ model QueueItem {
   skippedAt   DateTime?
   removedAt   DateTime?
   removedBy   String?
+  notifiedUpNextAt DateTime?
 
   @@index([position])
   @@index([startedAt])

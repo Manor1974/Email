@@ -44,7 +44,11 @@ export async function GET(req: NextRequest) {
   }
 
   const songs = await db.song.findMany({
-    where: { blockedAt: null, AND: conditions },
+    where: {
+      blockedAt: null,
+      filePath: { not: { startsWith: '__missing:' } },
+      AND: conditions,
+    },
     take: 50,
     orderBy: hasTextQuery
       ? [{ artist: 'asc' }, { title: 'asc' }]

@@ -10,13 +10,21 @@ export async function GET() {
   const [genreRows, yearRows] = await Promise.all([
     db.song.groupBy({
       by: ['genre'],
-      where: { blockedAt: null, genre: { not: null } },
+      where: {
+        blockedAt: null,
+        filePath: { not: { startsWith: '__missing:' } },
+        genre: { not: null },
+      },
       _count: { _all: true },
       orderBy: { _count: { genre: 'desc' } },
       take: 16,
     }),
     db.song.findMany({
-      where: { blockedAt: null, year: { not: null } },
+      where: {
+        blockedAt: null,
+        filePath: { not: { startsWith: '__missing:' } },
+        year: { not: null },
+      },
       select: { year: true },
     }),
   ]);

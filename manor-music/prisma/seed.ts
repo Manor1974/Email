@@ -14,7 +14,7 @@ async function main() {
     create: {
       id: 'singleton',
       maxSongsPerCustomer: 3,
-      songCooldownHours: 4,
+      songCooldownMinutes: 45,
       artistCooldownMinutes: 45,
       customerBlendRatio: 1,
       cleanModeOverride: 'AUTO',

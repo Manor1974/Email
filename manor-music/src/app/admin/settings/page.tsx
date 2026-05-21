@@ -19,7 +19,7 @@ export default async function SettingsPage() {
       <SettingsForm
         initial={{
           maxSongsPerCustomer: s.maxSongsPerCustomer,
-          songCooldownHours: s.songCooldownHours,
+          songCooldownMinutes: s.songCooldownMinutes,
           artistCooldownMinutes: s.artistCooldownMinutes,
           customerBlendRatio: s.customerBlendRatio,
         }}

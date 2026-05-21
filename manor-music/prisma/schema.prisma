@@ -176,7 +176,7 @@ model Station {
 model Settings {
   id                     String  @id @default("singleton")
   maxSongsPerCustomer    Int     @default(3)
-  songCooldownHours      Int     @default(4)
+  songCooldownMinutes    Int     @default(45)
   artistCooldownMinutes  Int     @default(45)
   customerBlendRatio     Int     @default(1)
   activeStationId        String?

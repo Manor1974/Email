@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 interface Initial {
   maxSongsPerCustomer: number;
-  songCooldownHours: number;
+  songCooldownMinutes: number;
   artistCooldownMinutes: number;
   customerBlendRatio: number;
 }
@@ -31,8 +31,8 @@ export function SettingsForm({ initial }: { initial: Initial }) {
     <form onSubmit={save} className="space-y-4">
       <NumberField label="Max songs per customer in queue" value={v.maxSongsPerCustomer}
         onChange={(n) => setV({ ...v, maxSongsPerCustomer: n })} min={1} max={20} />
-      <NumberField label="Song cooldown (hours) — same track can't replay within" value={v.songCooldownHours}
-        onChange={(n) => setV({ ...v, songCooldownHours: n })} min={0} max={48} />
+      <NumberField label="Song cooldown (minutes) — same track can't replay within" value={v.songCooldownMinutes}
+        onChange={(n) => setV({ ...v, songCooldownMinutes: n })} min={0} max={2880} />
       <NumberField label="Artist cooldown (minutes)" value={v.artistCooldownMinutes}
         onChange={(n) => setV({ ...v, artistCooldownMinutes: n })} min={0} max={240} />
       <NumberField label="Customer-to-station blend ratio (1 = customer track every N station tracks)" value={v.customerBlendRatio}

@@ -9,6 +9,15 @@ export class QueueError extends Error {
   }
 }
 
+function formatCooldownError(minutes: number): string {
+  if (minutes < 60) return `That song played in the last ${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0
+    ? `That song played in the last ${h}h`
+    : `That song played in the last ${h}h ${m}m`;
+}
+
 interface AddOptions {
   songId: string;
   customerId?: string | null;
@@ -40,7 +49,7 @@ async function resolveVersion(songId: string, location: string | null): Promise<
 export async function addToQueue(opts: AddOptions) {
   const settings = (await db.settings.findUnique({ where: { id: 'singleton' } })) ?? {
     maxSongsPerCustomer: 3,
-    songCooldownHours: 4,
+    songCooldownMinutes: 45,
     artistCooldownMinutes: 45,
     customerBlendRatio: 1,
     activeStationId: null,
@@ -67,14 +76,14 @@ export async function addToQueue(opts: AddOptions) {
       }
     }
 
-    const songCooldownAgo = new Date(Date.now() - settings.songCooldownHours * 60 * 60 * 1000);
+    const songCooldownAgo = new Date(Date.now() - settings.songCooldownMinutes * 60 * 1000);
     const recentSong = await db.play.findFirst({
       where: { songId: song.id, startedAt: { gte: songCooldownAgo } },
     });
     if (recentSong) {
       throw new QueueError(
         'SONG_COOLDOWN',
-        `That song played in the last ${settings.songCooldownHours}h`,
+        formatCooldownError(settings.songCooldownMinutes),
       );
     }
 

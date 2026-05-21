@@ -6,7 +6,7 @@ import { broadcast } from '@/lib/realtime';
 
 const Body = z.object({
   maxSongsPerCustomer: z.number().int().min(1).max(50),
-  songCooldownHours: z.number().int().min(0).max(72),
+  songCooldownMinutes: z.number().int().min(0).max(4320),
   artistCooldownMinutes: z.number().int().min(0).max(360),
   customerBlendRatio: z.number().int().min(0).max(20),
 });

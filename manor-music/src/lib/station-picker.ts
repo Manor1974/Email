@@ -36,7 +36,7 @@ export async function pickStationTrack(): Promise<Song | null> {
 
   const allowExplicit = await explicitAllowed();
 
-  const songCooldownAgo = new Date(Date.now() - settings.songCooldownHours * 60 * 60 * 1000);
+  const songCooldownAgo = new Date(Date.now() - settings.songCooldownMinutes * 60 * 1000);
   const artistCooldownAgo = new Date(Date.now() - settings.artistCooldownMinutes * 60 * 1000);
 
   const recentArtists = await db.play.findMany({

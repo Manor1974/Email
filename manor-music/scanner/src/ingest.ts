@@ -8,6 +8,7 @@ import { promises as fs } from 'fs';
 import { parseFile } from 'music-metadata';
 import { PrismaClient } from '@prisma/client';
 import twilio from 'twilio';
+import { canonicalGenre, extractBpmFromFilename, stripProviderTags } from './normalize.js';
 
 export const AUDIO_EXT = new Set(['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg']);
 export const VIDEO_EXT = new Set(['.mp4', '.mov', '.mkv', '.m4v', '.webm']);
@@ -58,25 +59,45 @@ export async function ingestAudio(db: PrismaClient, file: string, stats: ScanSta
     return;
   }
   const common = meta.common;
-  const title = (common.title || path.basename(file, path.extname(file))).trim();
-  const artist = (common.artist || common.albumartist || 'Unknown Artist').trim();
-  const album = common.album?.trim() || null;
+  const fileBase = path.basename(file, path.extname(file));
+  const rawTitle = common.title || fileBase;
+  const rawArtist = common.artist || common.albumartist || 'Unknown Artist';
+
+  // Strip provider watermarks ("(Promo Only)", "[BPM Supreme]", "(Intro)") so
+  // title/artist match cleanly across providers when computing cooldowns and
+  // clean/explicit pairs.
+  const title = stripProviderTags(rawTitle) || rawTitle.trim();
+  const artist = stripProviderTags(rawArtist) || rawArtist.trim();
+  const album = stripProviderTags(common.album ?? '') || null;
   const year = common.year || null;
-  const genre = common.genre?.[0] ?? null;
+  const genre = canonicalGenre(common.genre?.[0] ?? null);
   const durationSec = Math.round(meta.format.duration ?? 0);
   const tagExplicit = (common as { explicit?: boolean }).explicit;
   const isExplicit = detectExplicit(path.basename(file), tagExplicit);
+
+  // BPM resolution order: ID3 tag → filename → null. BPM Supreme commonly
+  // names files with the BPM in the filename, while Promo Only puts it in
+  // ID3. We accept either.
+  const rawBpm = (common as { bpm?: number | string }).bpm;
+  let bpm: number | null = null;
+  if (typeof rawBpm === 'number' && Number.isFinite(rawBpm)) {
+    bpm = Math.round(rawBpm);
+  } else if (typeof rawBpm === 'string') {
+    const parsed = parseInt(rawBpm, 10);
+    if (Number.isFinite(parsed) && parsed >= 40 && parsed <= 220) bpm = parsed;
+  }
+  if (bpm === null) bpm = extractBpmFromFilename(fileBase);
 
   const existing = await db.song.findUnique({ where: { filePath: file } });
   if (existing) {
     await db.song.update({
       where: { filePath: file },
-      data: { title, artist, album, year: year ?? undefined, genre, durationSec, isExplicit },
+      data: { title, artist, album, year: year ?? undefined, genre, durationSec, isExplicit, bpm },
     });
     stats.audioUpdated += 1;
   } else {
     await db.song.create({
-      data: { filePath: file, title, artist, album, year: year ?? undefined, genre, durationSec, isExplicit },
+      data: { filePath: file, title, artist, album, year: year ?? undefined, genre, durationSec, isExplicit, bpm },
     });
     stats.audioIngested += 1;
   }

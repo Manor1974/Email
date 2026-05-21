@@ -28,10 +28,13 @@ interface QueueItem {
   song: SongMeta;
 }
 
+type CleanMode = 'AUTO' | 'FORCE_CLEAN' | 'FORCE_EXPLICIT';
+
 interface ConsoleState {
   nowPlaying: QueueItem | null;
   queue: QueueItem[];
   playback: { state: 'PLAYING' | 'PAUSED'; volume: number };
+  cleanMode: CleanMode;
   activeStation: { id: string; name: string } | null;
   backgroundUrl: string | null;
 }
@@ -125,7 +128,9 @@ export function StaffConsole({ genres }: { genres: string[] }) {
   usePusherEvent('now-playing', loadState);
   usePusherEvent('settings:updated', loadState);
 
-  // Search/browse query — runs whenever filters change, debounced 200ms
+  // Search/browse query — chip clicks feel instant (0ms), text typing waits
+  // 200ms so we don't fire a fetch per keystroke. The fetch always runs on
+  // mount so the library auto-populates with the full alphabetical list.
   useEffect(() => {
     const params = new URLSearchParams();
     if (q.trim().length >= 2) params.set('q', q.trim());
@@ -140,6 +145,7 @@ export function StaffConsole({ genres }: { genres: string[] }) {
     }
     params.set('sort', sort);
     setSearching(true);
+    const wait = q.trim().length >= 2 ? 200 : 0;
     const t = setTimeout(async () => {
       try {
         const r = await fetch(`/api/staff/browse?${params.toString()}`);
@@ -148,7 +154,7 @@ export function StaffConsole({ genres }: { genres: string[] }) {
       } finally {
         setSearching(false);
       }
-    }, 200);
+    }, wait);
     return () => clearTimeout(t);
   }, [q, genre, decade, bpm, sort]);
 
@@ -185,6 +191,10 @@ export function StaffConsole({ genres }: { genres: string[] }) {
   const skip         = ()                           => action('/api/admin/queue/skip', null, 'POST', `Skipped`);
   const togglePause  = ()                           => action('/api/admin/playback', { playbackState: state?.playback.state === 'PAUSED' ? 'PLAYING' : 'PAUSED' }, 'PATCH');
   const setVolume    = (v: number)                  => action('/api/admin/playback', { playbackVolume: v }, 'PATCH');
+  const setCleanMode = (mode: CleanMode) => {
+    const label = mode === 'AUTO' ? 'Schedule' : mode === 'FORCE_CLEAN' ? 'Clean only' : 'Explicit allowed';
+    return action('/api/admin/clean-mode', { cleanModeOverride: mode }, 'PATCH', `Explicit lyrics: ${label}`);
+  };
   const blockSong    = async (id: string, title: string) => {
     const reason = window.prompt(`Block "${title}"? Optional reason:`);
     if (reason === null) return;
@@ -192,19 +202,69 @@ export function StaffConsole({ genres }: { genres: string[] }) {
     setResults((r) => r.filter((s) => s.id !== id));
   };
 
-  // Now-playing progress — tick every second on the client without re-fetching.
+  // ------- Progress / pause tracking -------
+  //
+  // The DB stores `startedAt` on the queueItem but doesn't track when the user
+  // hit pause, so the elapsed-time calculation has to compensate client-side.
+  // When the playback state flips PAUSED, we freeze elapsed at the pause
+  // instant. When it flips back to PLAYING, we add the pause duration to a
+  // running accumulator so the bar resumes from where it stopped instead of
+  // jumping to wall-clock-elapsed.
+  //
+  // Updates every 250ms; the CSS transition smooths between ticks for a
+  // visually-smooth bar.
+
   const [progressSec, setProgressSec] = useState(0);
+  const accumulatedPauseMsRef = useRef(0);
+  const pauseStartMsRef       = useRef<number | null>(null);
+  const lastStateRef          = useRef<'PLAYING' | 'PAUSED' | null>(null);
+  const lastTrackIdRef        = useRef<string | null>(null);
+
+  // React to song changes — reset pause accumulators.
+  useEffect(() => {
+    const nowId = state?.nowPlaying?.id ?? null;
+    if (nowId !== lastTrackIdRef.current) {
+      accumulatedPauseMsRef.current = 0;
+      pauseStartMsRef.current       = null;
+      lastTrackIdRef.current        = nowId;
+    }
+  }, [state?.nowPlaying?.id]);
+
+  // React to play/pause toggles.
+  useEffect(() => {
+    const cur = state?.playback.state;
+    if (!cur) return;
+    const prev = lastStateRef.current;
+    if (cur === 'PAUSED' && prev !== 'PAUSED') {
+      // Just hit pause — snapshot wall-clock now so we can freeze the bar.
+      pauseStartMsRef.current = Date.now();
+    } else if (cur === 'PLAYING' && prev === 'PAUSED' && pauseStartMsRef.current !== null) {
+      // Just resumed — fold the pause duration into the accumulator.
+      accumulatedPauseMsRef.current += Date.now() - pauseStartMsRef.current;
+      pauseStartMsRef.current = null;
+    }
+    lastStateRef.current = cur;
+  }, [state?.playback.state]);
+
+  // The 4Hz tick that drives the progress bar + time text.
   useEffect(() => {
     if (!state?.nowPlaying?.startedAt) {
       setProgressSec(0);
       return;
     }
     const startMs = new Date(state.nowPlaying.startedAt).getTime();
-    const update = () => setProgressSec(Math.max(0, (Date.now() - startMs) / 1000));
+    const update = () => {
+      const isPaused = state.playback.state === 'PAUSED';
+      const effectiveNow = isPaused && pauseStartMsRef.current !== null
+        ? pauseStartMsRef.current
+        : Date.now();
+      const elapsedMs = effectiveNow - startMs - accumulatedPauseMsRef.current;
+      setProgressSec(Math.max(0, elapsedMs / 1000));
+    };
     update();
-    const t = setInterval(update, 1000);
+    const t = setInterval(update, 250);
     return () => clearInterval(t);
-  }, [state?.nowPlaying?.id, state?.nowPlaying?.startedAt]);
+  }, [state?.nowPlaying?.id, state?.nowPlaying?.startedAt, state?.playback.state]);
 
   const queueDuration = useMemo(
     () => (state?.queue ?? []).reduce((acc, q) => acc + q.song.durationSec, 0),
@@ -219,10 +279,30 @@ export function StaffConsole({ genres }: { genres: string[] }) {
     );
   }
 
-  const np = state.nowPlaying;
-  const upNext = state.queue[0] ?? null;
-  const restOfQueue = state.queue.slice(1);
-  const progressPct = np ? Math.min(100, (progressSec / Math.max(1, np.song.durationSec)) * 100) : 0;
+  const np            = state.nowPlaying;
+  const isPaused      = state.playback.state === 'PAUSED';
+  const upNext        = state.queue[0] ?? null;
+  const restOfQueue   = state.queue.slice(1);
+  const songDuration  = np?.song.durationSec ?? 0;
+  const progressPct   = np ? Math.min(100, (progressSec / Math.max(1, songDuration)) * 100) : 0;
+  const remainingSec  = Math.max(0, songDuration - progressSec);
+
+  // For "starts in X" on queue items: cumulative remaining time.
+  // Index 0 = upNext → starts in `remainingSec`
+  // Index N = starts in remainingSec + sum(durations up to N-1)
+  const startsInFor = (idx: number) => {
+    let total = remainingSec;
+    // restOfQueue is index 0 onward; the corresponding upcoming songs that
+    // play *before* this one are restOfQueue[0..idx-1] plus upNext.
+    if (upNext) {
+      for (let i = 0; i < idx; i++) {
+        total += restOfQueue[i]?.song.durationSec ?? 0;
+      }
+    }
+    return total;
+  };
+
+  const upNextStartsIn = remainingSec;
 
   return (
     <main className="relative min-h-screen">
@@ -250,31 +330,45 @@ export function StaffConsole({ genres }: { genres: string[] }) {
         <BrandHeader subtitle="DJ Console" />
 
         {/* TWO-DECK ROW */}
-        <div className="grid lg:grid-cols-2 gap-4 mb-4">
+        <div className="grid lg:grid-cols-2 gap-4 mb-4 mt-4">
           <Deck label="Now playing" tone="active">
             {np ? (
               <>
                 <CoverPlaceholder song={np.song} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xl font-bold text-manor-white truncate">{np.song.title}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xl font-bold text-manor-white truncate">{np.song.title}</div>
+                    {isPaused && (
+                      <span className="px-2 py-0.5 bg-manor-danger text-white rounded text-[10px] font-bold tracking-wider animate-pulse">
+                        ⏸ PAUSED
+                      </span>
+                    )}
+                  </div>
                   <div className="text-manor-offwhite/80 truncate">{np.song.artist}</div>
                   <div className="text-xs text-manor-offwhite/50 truncate mt-1">{metaLine(np.song)}</div>
                   <div className="text-xs text-manor-gold mt-1">{sourceLabel(np)}</div>
                   <div className="mt-3">
                     <div className="h-2 rounded-full bg-manor-navyDeep overflow-hidden">
                       <div
-                        className="h-full bg-manor-gold transition-[width] duration-300"
-                        style={{ width: `${progressPct}%` }}
+                        className={`h-full rounded-full ${isPaused ? 'bg-manor-grayLight' : 'bg-manor-gold'}`}
+                        style={{
+                          width: `${progressPct}%`,
+                          transition: 'width 250ms linear',
+                        }}
                       />
                     </div>
-                    <div className="flex justify-between text-xs text-manor-offwhite/50 mt-1">
+                    <div className="flex justify-between text-xs text-manor-offwhite/60 mt-1 font-mono">
                       <span>{fmtTime(progressSec)}</span>
-                      <span>{fmtTime(np.song.durationSec)}</span>
+                      <span className="text-manor-gold">-{fmtTime(remainingSec)}</span>
+                      <span>{fmtTime(songDuration)}</span>
                     </div>
                   </div>
                   <div className="flex gap-2 mt-3">
-                    <button onClick={togglePause} className="btn-primary flex-1">
-                      {state.playback.state === 'PAUSED' ? '▶ Resume' : '⏸ Pause'}
+                    <button
+                      onClick={togglePause}
+                      className={isPaused ? 'btn-primary flex-1' : 'btn-ghost flex-1'}
+                    >
+                      {isPaused ? '▶ Resume' : '⏸ Pause'}
                     </button>
                     <button onClick={skip} className="btn-ghost flex-1">⏭ Skip</button>
                   </div>
@@ -294,8 +388,9 @@ export function StaffConsole({ genres }: { genres: string[] }) {
                   <div className="text-manor-offwhite/80 truncate">{upNext.song.artist}</div>
                   <div className="text-xs text-manor-offwhite/50 truncate mt-1">{metaLine(upNext.song)}</div>
                   <div className="text-xs text-manor-gold mt-1">{sourceLabel(upNext)}</div>
-                  <div className="text-xs text-manor-offwhite/50 mt-2">
-                    Starts in ~{np ? fmtTime(Math.max(0, np.song.durationSec - progressSec)) : fmtTime(0)}
+                  <div className="text-xs text-manor-offwhite/60 mt-2 font-mono">
+                    Starts in <span className="text-manor-gold">{fmtTime(upNextStartsIn)}</span>
+                    {isPaused && <span className="text-manor-danger ml-2">(paused)</span>}
                   </div>
                   <div className="flex gap-2 mt-3">
                     <button onClick={() => removeQueued(upNext.id)} className="btn-ghost flex-1">
@@ -311,19 +406,33 @@ export function StaffConsole({ genres }: { genres: string[] }) {
         </div>
 
         {/* PLAYBACK BAR */}
-        <section className="card flex items-center gap-4 mb-4 bg-manor-grayMid/70">
-          <span className="text-xs uppercase tracking-wider text-manor-offwhite/50">Volume</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={state.playback.volume}
-            onChange={(e) => setVolume(parseInt(e.target.value, 10))}
-            className="flex-1 accent-manor-gold"
-          />
-          <span className="text-manor-gold font-mono w-10 text-right">{state.playback.volume}</span>
-          <div className="ml-4 text-xs text-manor-offwhite/50">
-            Auto-DJ: <span className="text-manor-gold">{state.activeStation?.name ?? 'off'}</span>
+        <section className="card mb-4 bg-manor-grayMid/70 space-y-3">
+          <div className="flex items-center gap-4">
+            <span className="text-xs uppercase tracking-wider text-manor-offwhite/50 w-16">Volume</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={state.playback.volume}
+              onChange={(e) => setVolume(parseInt(e.target.value, 10))}
+              className="flex-1 accent-manor-gold"
+            />
+            <span className="text-manor-gold font-mono w-10 text-right">{state.playback.volume}</span>
+            <div className="ml-4 text-xs text-manor-offwhite/50 whitespace-nowrap">
+              Auto-DJ: <span className="text-manor-gold">{state.activeStation?.name ?? 'off'}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs uppercase tracking-wider text-manor-offwhite/50 w-16 shrink-0">Explicit</span>
+            <CleanModeChip active={state.cleanMode === 'AUTO'}            onClick={() => setCleanMode('AUTO')}>Schedule</CleanModeChip>
+            <CleanModeChip active={state.cleanMode === 'FORCE_CLEAN'}     onClick={() => setCleanMode('FORCE_CLEAN')}>Clean only</CleanModeChip>
+            <CleanModeChip active={state.cleanMode === 'FORCE_EXPLICIT'}  onClick={() => setCleanMode('FORCE_EXPLICIT')}>Allow explicit</CleanModeChip>
+            <span className="text-xs text-manor-offwhite/40 ml-auto whitespace-nowrap">
+              {state.cleanMode === 'AUTO' && 'Following /admin/schedule windows'}
+              {state.cleanMode === 'FORCE_CLEAN' && 'Explicit blocked regardless of time'}
+              {state.cleanMode === 'FORCE_EXPLICIT' && 'Explicit allowed regardless of time'}
+            </span>
           </div>
         </section>
 
@@ -333,7 +442,7 @@ export function StaffConsole({ genres }: { genres: string[] }) {
             <div>
               <span className="text-xs uppercase tracking-wider text-manor-offwhite/50">Queue</span>
               <span className="ml-2 text-manor-offwhite/70 text-sm">
-                {restOfQueue.length} tracks · {fmtTime(queueDuration - (upNext?.song.durationSec ?? 0))}
+                {restOfQueue.length} track{restOfQueue.length === 1 ? '' : 's'} · {fmtTime(queueDuration - (upNext?.song.durationSec ?? 0))}
               </span>
             </div>
           </div>
@@ -356,7 +465,12 @@ export function StaffConsole({ genres }: { genres: string[] }) {
                       )}
                     </div>
                   </div>
-                  <span className="text-xs text-manor-offwhite/50 hidden md:inline">{fmtTime(item.song.durationSec)}</span>
+                  <span className="text-xs text-manor-offwhite/60 font-mono whitespace-nowrap">
+                    in {fmtTime(startsInFor(i + 1))}
+                  </span>
+                  <span className="text-xs text-manor-offwhite/40 font-mono hidden md:inline">
+                    {fmtTime(item.song.durationSec)}
+                  </span>
                   <button
                     onClick={() => removeQueued(item.id)}
                     className="text-manor-offwhite/50 hover:text-manor-danger px-2 py-1"
@@ -372,7 +486,12 @@ export function StaffConsole({ genres }: { genres: string[] }) {
 
         {/* SEARCH + BROWSE */}
         <section className="card">
-          <div className="text-xs uppercase tracking-wider text-manor-offwhite/50 mb-3">Library</div>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-xs uppercase tracking-wider text-manor-offwhite/50">Library</h2>
+            <span className="text-manor-gold font-mono text-sm">
+              {searching ? 'Searching…' : `${results.length} song${results.length === 1 ? '' : 's'}`}
+            </span>
+          </div>
 
           <div className="grid md:grid-cols-[1fr_auto] gap-3 mb-3">
             <input
@@ -392,10 +511,44 @@ export function StaffConsole({ genres }: { genres: string[] }) {
             </select>
           </div>
 
+          {/* Active filter banner — visible feedback that the chips drive the list */}
+          {(genre || decade || bpm) && (
+            <div className="flex items-center gap-2 mb-3 text-sm text-manor-offwhite/80">
+              <span className="text-manor-offwhite/50">Showing:</span>
+              {genre && (
+                <button
+                  onClick={() => setGenre(null)}
+                  className="px-2 py-0.5 bg-manor-gold text-manor-navyDeep rounded-full text-xs font-semibold"
+                >
+                  {genre} ×
+                </button>
+              )}
+              {decade && (
+                <button
+                  onClick={() => setDecade(null)}
+                  className="px-2 py-0.5 bg-manor-gold text-manor-navyDeep rounded-full text-xs font-semibold"
+                >
+                  {decade.label} ×
+                </button>
+              )}
+              {bpm && (
+                <button
+                  onClick={() => setBpm(null)}
+                  className="px-2 py-0.5 bg-manor-gold text-manor-navyDeep rounded-full text-xs font-semibold"
+                >
+                  {bpm.label} ×
+                </button>
+              )}
+              <button
+                onClick={() => { setGenre(null); setDecade(null); setBpm(null); }}
+                className="text-xs text-manor-offwhite/40 underline ml-auto"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2 mb-2">
-            <Chip active={!genre && !decade && !bpm} onClick={() => { setGenre(null); setDecade(null); setBpm(null); }}>
-              All
-            </Chip>
             {genres.map((g) => (
               <Chip key={g} active={genre === g} onClick={() => setGenre(genre === g ? null : g)}>
                 {g}
@@ -415,10 +568,6 @@ export function StaffConsole({ genres }: { genres: string[] }) {
                 {b.label}
               </Chip>
             ))}
-          </div>
-
-          <div className="text-xs text-manor-offwhite/40 mb-2">
-            {searching ? 'Searching…' : `${results.length} song${results.length === 1 ? '' : 's'}`}
           </div>
 
           <ul className="space-y-1">
@@ -475,7 +624,9 @@ export function StaffConsole({ genres }: { genres: string[] }) {
               </li>
             ))}
             {!searching && results.length === 0 && (
-              <li className="text-manor-offwhite/50 text-sm">No matches.</li>
+              <li className="text-manor-offwhite/50 text-sm">
+                No matches. {(genre || decade || bpm) && 'Try fewer filters.'}
+              </li>
             )}
           </ul>
         </section>
@@ -549,6 +700,29 @@ function Chip({
         ${active
           ? 'bg-manor-gold text-manor-navyDeep font-semibold'
           : 'bg-manor-grayMid text-manor-offwhite hover:bg-manor-gray border border-manor-gray'
+        }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function CleanModeChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors
+        ${active
+          ? 'bg-manor-gold text-manor-navyDeep'
+          : 'bg-manor-navyDeep text-manor-offwhite hover:bg-manor-navy border border-manor-gray'
         }`}
     >
       {children}

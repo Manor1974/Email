@@ -22,6 +22,7 @@ export default async function SettingsPage() {
           songCooldownMinutes: s.songCooldownMinutes,
           artistCooldownMinutes: s.artistCooldownMinutes,
           customerBlendRatio: s.customerBlendRatio,
+          cleanModeOverride: s.cleanModeOverride as 'AUTO' | 'FORCE_CLEAN' | 'FORCE_EXPLICIT',
           staffBackgroundUrl: s.staffBackgroundUrl,
         }}
       />

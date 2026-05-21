@@ -43,6 +43,10 @@ interface Track {
 interface PlayerState {
   playbackState: 'PLAYING' | 'PAUSED';
   playbackVolume: number;
+  // Song the server expects to be playing right now. If our mpv is playing
+  // something different we kill it so the next tick fetches the new track.
+  // null = server thinks nothing should be playing (between tracks).
+  expectedSongId?: string | null;
 }
 
 let mpv: ChildProcess | null = null;
@@ -162,11 +166,27 @@ async function applyDesiredState() {
 }
 
 async function tick() {
+  let state: PlayerState | null = null;
   try {
-    desired = await fetchState();
+    state = await fetchState();
+    desired = { playbackState: state.playbackState, playbackVolume: state.playbackVolume };
   } catch {
     /* network blip — keep last-known desired */
   }
+
+  // Server-driven skip: if we're playing something different from what the
+  // server expects, kill mpv so the next tick picks up the new track. This
+  // makes "Play Now" and Skip take effect immediately rather than waiting
+  // for the current audio file to finish on its own.
+  if (state && mpv && currentSongId && state.expectedSongId !== currentSongId) {
+    log(`server expects ${state.expectedSongId ?? '(none)'}, we have ${currentSongId} — switching`);
+    try {
+      mpv.kill('SIGTERM');
+    } catch {
+      /* mpv will exit on its own */
+    }
+  }
+
   await applyDesiredState();
   if (desired.playbackState === 'PLAYING' && !mpv) {
     await ensureNextTrack();

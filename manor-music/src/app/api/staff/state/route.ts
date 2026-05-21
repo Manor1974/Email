@@ -64,6 +64,7 @@ export async function GET() {
       state: settings?.playbackState ?? 'PLAYING',
       volume: settings?.playbackVolume ?? 80,
     },
+    cleanMode: (settings?.cleanModeOverride ?? 'AUTO') as 'AUTO' | 'FORCE_CLEAN' | 'FORCE_EXPLICIT',
     activeStation,
     backgroundUrl: settings?.staffBackgroundUrl ?? null,
   });

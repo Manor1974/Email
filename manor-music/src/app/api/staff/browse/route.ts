@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { isAdmin } from '@/lib/auth-admin';
+import { matchesGenre } from '@/lib/genres';
 
 export async function GET(req: NextRequest) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -25,7 +26,20 @@ export async function GET(req: NextRequest) {
       { album: { contains: q, mode: 'insensitive' } },
     ];
   }
-  if (genre) where.genre = { equals: genre, mode: 'insensitive' };
+  if (genre) {
+    // The chip the user clicked is canonical ("Hip-Hop") but the DB may have
+    // dozens of variants ("hip-hop", "HipHop", "Hip Hop", "Rap"). Find all
+    // variants that resolve to the same canonical name and match any of them.
+    const distinctGenres = await db.song.findMany({
+      where: { genre: { not: null } },
+      distinct: ['genre'],
+      select: { genre: true },
+    });
+    const matching = distinctGenres
+      .map((r) => r.genre!)
+      .filter((g) => matchesGenre(g, genre));
+    where.genre = matching.length > 0 ? { in: matching } : { equals: genre, mode: 'insensitive' };
+  }
   if (minYear || maxYear) {
     where.year = {
       ...(minYear ? { gte: parseInt(minYear, 10) } : {}),

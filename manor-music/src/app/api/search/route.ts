@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { explicitAllowed } from '@/lib/schedule';
+import { matchesGenre } from '@/lib/genres';
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
@@ -29,7 +30,17 @@ export async function GET(req: NextRequest) {
     });
   }
   if (genre) {
-    conditions.push({ genre: { equals: genre, mode: 'insensitive' } });
+    const distinctGenres = await db.song.findMany({
+      where: { genre: { not: null } },
+      distinct: ['genre'],
+      select: { genre: true },
+    });
+    const matching = distinctGenres.map((r) => r.genre!).filter((g) => matchesGenre(g, genre));
+    conditions.push(
+      matching.length > 0
+        ? { genre: { in: matching } }
+        : { genre: { equals: genre, mode: 'insensitive' } },
+    );
   }
   if (decade && Number.isFinite(decade)) {
     conditions.push({ year: { gte: decade, lt: decade + 10 } });

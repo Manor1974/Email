@@ -7,8 +7,8 @@
 }
 
 html, body {
-  background-color: #0E1116;
-  color: #F2E9D8;
+  background-color: #0F2348;
+  color: #F4F5F7;
   min-height: 100dvh;
 }
 
@@ -23,20 +23,20 @@ body {
            transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-manor-teal text-manor-ink hover:bg-manor-tealDark;
+    @apply btn bg-manor-gold text-manor-navyDeep hover:bg-manor-goldDeep;
   }
   .btn-ghost {
-    @apply btn bg-manor-panel text-manor-cream hover:bg-manor-line border border-manor-line;
+    @apply btn bg-manor-grayMid text-manor-offwhite hover:bg-manor-gray border border-manor-gray;
   }
   .btn-danger {
     @apply btn bg-manor-danger text-white hover:opacity-90;
   }
   .input {
-    @apply w-full rounded-xl bg-manor-panel border border-manor-line text-manor-cream
-           px-4 py-3 placeholder:text-manor-cream/40
-           focus:outline-none focus:border-manor-teal;
+    @apply w-full rounded-xl bg-manor-grayMid border border-manor-gray text-manor-offwhite
+           px-4 py-3 placeholder:text-manor-offwhite/40
+           focus:outline-none focus:border-manor-gold;
   }
   .card {
-    @apply rounded-2xl bg-manor-panel border border-manor-line p-4;
+    @apply rounded-2xl bg-manor-grayMid border border-manor-gray p-4;
   }
 }

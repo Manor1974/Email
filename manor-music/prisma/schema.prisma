@@ -183,4 +183,5 @@ model Settings {
   cleanModeOverride      String  @default("AUTO") // AUTO | FORCE_CLEAN | FORCE_EXPLICIT
   playbackState          String  @default("PLAYING") // PLAYING | PAUSED
   playbackVolume         Int     @default(80)
+  staffBackgroundUrl     String?
 }

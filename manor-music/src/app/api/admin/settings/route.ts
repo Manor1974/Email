@@ -9,6 +9,7 @@ const Body = z.object({
   songCooldownMinutes: z.number().int().min(0).max(4320),
   artistCooldownMinutes: z.number().int().min(0).max(360),
   customerBlendRatio: z.number().int().min(0).max(20),
+  staffBackgroundUrl: z.string().url().max(2048).nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {

@@ -1,25 +1,45 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePusherEvent } from '@/lib/usePusher';
+import { BrandHeader } from '@/components/Brand';
 
-interface Hit {
+type QueueSource = 'CUSTOMER' | 'STAFF' | 'STATION';
+
+interface SongMeta {
   id: string;
   title: string;
   artist: string;
   album: string | null;
+  durationSec: number;
   isExplicit: boolean;
   hasVideo: boolean;
-  genre?: string | null;
-  year?: number | null;
-  bpm?: number | null;
+  genre: string | null;
+  year: number | null;
+  bpm: number | null;
 }
 
-interface NowPlaying {
-  song: { title: string; artist: string } | null;
+interface QueueItem {
+  id: string;
+  source: QueueSource;
+  location: string | null;
+  startedAt: string | null;
+  customer: { displayName: string | null } | null;
+  song: SongMeta;
 }
+
+interface ConsoleState {
+  nowPlaying: QueueItem | null;
+  queue: QueueItem[];
+  playback: { state: 'PLAYING' | 'PAUSED'; volume: number };
+  activeStation: { id: string; name: string } | null;
+  backgroundUrl: string | null;
+}
+
+interface SearchHit extends SongMeta {}
 
 const DECADES = [
-  { label: '2020s', min: 2020, max: 2099 },
+  { label: '2020s', min: 2020, max: 2029 },
   { label: '2010s', min: 2010, max: 2019 },
   { label: '2000s', min: 2000, max: 2009 },
   { label: '90s', min: 1990, max: 1999 },
@@ -27,146 +47,497 @@ const DECADES = [
   { label: '70s', min: 1970, max: 1979 },
 ];
 
+const BPM_RANGES = [
+  { label: 'Chill (60–90)', min: 60, max: 90 },
+  { label: 'Mid (90–110)', min: 90, max: 110 },
+  { label: 'Upbeat (110–130)', min: 110, max: 130 },
+  { label: 'Dance (130+)', min: 130, max: 200 },
+];
+
+const SORT_OPTIONS = [
+  { value: 'artist', label: 'Artist A→Z' },
+  { value: 'title', label: 'Title A→Z' },
+  { value: 'bpm', label: 'BPM (slow→fast)' },
+  { value: 'year', label: 'Year (new→old)' },
+  { value: 'recent', label: 'Recently added' },
+];
+
+function fmtTime(sec: number) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function metaLine(s: SongMeta) {
+  const parts: string[] = [];
+  if (s.genre) parts.push(s.genre);
+  if (s.year) parts.push(String(s.year));
+  if (s.bpm) parts.push(`${s.bpm} BPM`);
+  parts.push(fmtTime(s.durationSec));
+  return parts.join(' · ');
+}
+
+function sourceLabel(item: QueueItem) {
+  if (item.source === 'STATION') return 'Auto-DJ';
+  if (item.source === 'STAFF') return 'Staff';
+  const name = item.customer?.displayName ?? 'Customer';
+  return item.location ? `${name} @ ${item.location}` : name;
+}
+
 export function StaffConsole({ genres }: { genres: string[] }) {
+  const [state, setState] = useState<ConsoleState | null>(null);
   const [q, setQ] = useState('');
   const [genre, setGenre] = useState<string | null>(null);
-  const [decade, setDecade] = useState<{ min: number; max: number } | null>(null);
-  const [results, setResults] = useState<Hit[]>([]);
-  const [np, setNp] = useState<NowPlaying | null>(null);
-  const [queueLen, setQueueLen] = useState(0);
+  const [decade, setDecade] = useState<typeof DECADES[number] | null>(null);
+  const [bpm, setBpm] = useState<typeof BPM_RANGES[number] | null>(null);
+  const [sort, setSort] = useState('artist');
+  const [results, setResults] = useState<SearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'err' } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    const refresh = async () => {
-      const r = await fetch('/api/queue');
-      const j = await r.json();
-      setNp(j.nowPlaying ?? null);
-      setQueueLen((j.queue ?? []).length);
-    };
-    refresh();
-    const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
+  const flashToast = useCallback((text: string, tone: 'ok' | 'err' = 'ok') => {
+    setToast({ text, tone });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
   }, []);
 
+  const loadState = useCallback(async () => {
+    try {
+      const r = await fetch('/api/staff/state', { cache: 'no-store' });
+      if (!r.ok) return;
+      const j = (await r.json()) as ConsoleState;
+      setState(j);
+    } catch {
+      /* network blip */
+    }
+  }, []);
+
+  // Initial load + polling fallback (in case Pusher drops)
+  useEffect(() => {
+    loadState();
+    const t = setInterval(loadState, 5000);
+    return () => clearInterval(t);
+  }, [loadState]);
+
+  usePusherEvent('queue:updated', loadState);
+  usePusherEvent('now-playing', loadState);
+  usePusherEvent('settings:updated', loadState);
+
+  // Search/browse query — runs whenever filters change, debounced 200ms
   useEffect(() => {
     const params = new URLSearchParams();
-    if (q) params.set('q', q);
+    if (q.trim().length >= 2) params.set('q', q.trim());
     if (genre) params.set('genre', genre);
     if (decade) {
       params.set('minYear', String(decade.min));
       params.set('maxYear', String(decade.max));
     }
-    fetch(`/api/staff/browse?${params.toString()}`)
-      .then((r) => r.json())
-      .then((j) => setResults(j.results ?? []));
-  }, [q, genre, decade]);
+    if (bpm) {
+      params.set('minBpm', String(bpm.min));
+      params.set('maxBpm', String(bpm.max));
+    }
+    params.set('sort', sort);
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/staff/browse?${params.toString()}`);
+        const j = await r.json();
+        setResults(j.results ?? []);
+      } finally {
+        setSearching(false);
+      }
+    }, 200);
+    return () => clearTimeout(t);
+  }, [q, genre, decade, bpm, sort]);
 
-  async function queue(songId: string, asStation = false) {
-    await fetch('/api/staff/queue', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ songId, asStation }),
-    });
+  async function action(
+    url: string,
+    body: object | null,
+    method: 'POST' | 'DELETE' | 'PATCH' = 'POST',
+    successMsg?: string,
+  ) {
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: body ? { 'content-type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        flashToast(j.error ?? `Failed (${r.status})`, 'err');
+        return false;
+      }
+      if (successMsg) flashToast(successMsg);
+      loadState();
+      return true;
+    } catch (e) {
+      flashToast((e as Error).message, 'err');
+      return false;
+    }
   }
 
-  async function skip() {
-    await fetch('/api/admin/queue/skip', { method: 'POST' });
-  }
-
-  async function block(songId: string, title: string) {
-    const reason = prompt(`Block "${title}"? Optional reason:`);
+  const playNow      = (id: string, title: string) => action('/api/staff/play-now',  { songId: id }, 'POST', `▶ Playing now: ${title}`);
+  const playNext     = (id: string, title: string) => action('/api/staff/play-next', { songId: id }, 'POST', `⏭ Up next: ${title}`);
+  const addToQueue   = (id: string, title: string) => action('/api/staff/queue',     { songId: id }, 'POST', `+ Queued: ${title}`);
+  const removeQueued = (id: string)                 => action(`/api/admin/queue/${id}`, null, 'DELETE', `Removed from queue`);
+  const skip         = ()                           => action('/api/admin/queue/skip', null, 'POST', `Skipped`);
+  const togglePause  = ()                           => action('/api/admin/playback', { playbackState: state?.playback.state === 'PAUSED' ? 'PLAYING' : 'PAUSED' }, 'PATCH');
+  const setVolume    = (v: number)                  => action('/api/admin/playback', { playbackVolume: v }, 'PATCH');
+  const blockSong    = async (id: string, title: string) => {
+    const reason = window.prompt(`Block "${title}"? Optional reason:`);
     if (reason === null) return;
-    await fetch(`/api/admin/songs/${songId}/block`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    });
-    setResults((r) => r.filter((s) => s.id !== songId));
+    await action(`/api/admin/songs/${id}/block`, { reason }, 'POST', `Blocked: ${title}`);
+    setResults((r) => r.filter((s) => s.id !== id));
+  };
+
+  // Now-playing progress — tick every second on the client without re-fetching.
+  const [progressSec, setProgressSec] = useState(0);
+  useEffect(() => {
+    if (!state?.nowPlaying?.startedAt) {
+      setProgressSec(0);
+      return;
+    }
+    const startMs = new Date(state.nowPlaying.startedAt).getTime();
+    const update = () => setProgressSec(Math.max(0, (Date.now() - startMs) / 1000));
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [state?.nowPlaying?.id, state?.nowPlaying?.startedAt]);
+
+  const queueDuration = useMemo(
+    () => (state?.queue ?? []).reduce((acc, q) => acc + q.song.durationSec, 0),
+    [state?.queue],
+  );
+
+  if (!state) {
+    return (
+      <main className="min-h-screen flex items-center justify-center text-manor-offwhite/70">
+        Loading…
+      </main>
+    );
   }
+
+  const np = state.nowPlaying;
+  const upNext = state.queue[0] ?? null;
+  const restOfQueue = state.queue.slice(1);
+  const progressPct = np ? Math.min(100, (progressSec / Math.max(1, np.song.durationSec)) * 100) : 0;
 
   return (
-    <div className="grid md:grid-cols-[280px_1fr] gap-4">
-      <aside className="space-y-4">
-        <section className="card">
-          <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-2">Now playing</div>
-          {np?.song ? (
-            <div>
-              <div className="font-semibold text-manor-cream">{np.song.title}</div>
-              <div className="text-sm text-manor-cream/70 mb-2">{np.song.artist}</div>
-              <button onClick={skip} className="btn-ghost w-full">Skip</button>
-            </div>
-          ) : (
-            <div className="text-manor-cream/50">—</div>
-          )}
-          <div className="text-xs text-manor-cream/50 mt-2">{queueLen} in queue</div>
-        </section>
+    <main className="relative min-h-screen">
+      {/* Optional background image */}
+      {state.backgroundUrl && (
+        <div
+          className="fixed inset-0 -z-10 bg-cover bg-center"
+          style={{ backgroundImage: `url(${state.backgroundUrl})` }}
+        >
+          <div className="absolute inset-0 bg-manor-navyDeep/80" />
+        </div>
+      )}
 
-        <section className="card">
-          <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-2">Genre</div>
-          <div className="flex flex-wrap gap-1">
-            <Chip active={genre === null} onClick={() => setGenre(null)}>All</Chip>
-            {genres.map((g) => (
-              <Chip key={g} active={genre === g} onClick={() => setGenre(g)}>{g}</Chip>
-            ))}
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-lg
+            ${toast.tone === 'err' ? 'bg-manor-danger text-white' : 'bg-manor-gold text-manor-navyDeep'}`}
+        >
+          {toast.text}
+        </div>
+      )}
+
+      <div className="mx-auto max-w-7xl px-4 pb-24">
+        <BrandHeader subtitle="DJ Console" />
+
+        {/* TWO-DECK ROW */}
+        <div className="grid lg:grid-cols-2 gap-4 mb-4">
+          <Deck label="Now playing" tone="active">
+            {np ? (
+              <>
+                <CoverPlaceholder song={np.song} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xl font-bold text-manor-white truncate">{np.song.title}</div>
+                  <div className="text-manor-offwhite/80 truncate">{np.song.artist}</div>
+                  <div className="text-xs text-manor-offwhite/50 truncate mt-1">{metaLine(np.song)}</div>
+                  <div className="text-xs text-manor-gold mt-1">{sourceLabel(np)}</div>
+                  <div className="mt-3">
+                    <div className="h-2 rounded-full bg-manor-navyDeep overflow-hidden">
+                      <div
+                        className="h-full bg-manor-gold transition-[width] duration-300"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-manor-offwhite/50 mt-1">
+                      <span>{fmtTime(progressSec)}</span>
+                      <span>{fmtTime(np.song.durationSec)}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={togglePause} className="btn-primary flex-1">
+                      {state.playback.state === 'PAUSED' ? '▶ Resume' : '⏸ Pause'}
+                    </button>
+                    <button onClick={skip} className="btn-ghost flex-1">⏭ Skip</button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-manor-offwhite/50 text-center w-full">Nothing playing right now.</div>
+            )}
+          </Deck>
+
+          <Deck label="Up next" tone="next">
+            {upNext ? (
+              <>
+                <CoverPlaceholder song={upNext.song} dim />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xl font-bold text-manor-white truncate">{upNext.song.title}</div>
+                  <div className="text-manor-offwhite/80 truncate">{upNext.song.artist}</div>
+                  <div className="text-xs text-manor-offwhite/50 truncate mt-1">{metaLine(upNext.song)}</div>
+                  <div className="text-xs text-manor-gold mt-1">{sourceLabel(upNext)}</div>
+                  <div className="text-xs text-manor-offwhite/50 mt-2">
+                    Starts in ~{np ? fmtTime(Math.max(0, np.song.durationSec - progressSec)) : fmtTime(0)}
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={() => removeQueued(upNext.id)} className="btn-ghost flex-1">
+                      ⏏ Remove
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-manor-offwhite/50 text-center w-full">Queue is empty.</div>
+            )}
+          </Deck>
+        </div>
+
+        {/* PLAYBACK BAR */}
+        <section className="card flex items-center gap-4 mb-4 bg-manor-grayMid/70">
+          <span className="text-xs uppercase tracking-wider text-manor-offwhite/50">Volume</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={state.playback.volume}
+            onChange={(e) => setVolume(parseInt(e.target.value, 10))}
+            className="flex-1 accent-manor-gold"
+          />
+          <span className="text-manor-gold font-mono w-10 text-right">{state.playback.volume}</span>
+          <div className="ml-4 text-xs text-manor-offwhite/50">
+            Auto-DJ: <span className="text-manor-gold">{state.activeStation?.name ?? 'off'}</span>
           </div>
         </section>
 
+        {/* QUEUE */}
+        <section className="card mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-manor-offwhite/50">Queue</span>
+              <span className="ml-2 text-manor-offwhite/70 text-sm">
+                {restOfQueue.length} tracks · {fmtTime(queueDuration - (upNext?.song.durationSec ?? 0))}
+              </span>
+            </div>
+          </div>
+          {restOfQueue.length === 0 ? (
+            <div className="text-manor-offwhite/50 text-sm">Nothing else queued. Add songs below.</div>
+          ) : (
+            <ol className="space-y-1">
+              {restOfQueue.map((item, i) => (
+                <li
+                  key={item.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-manor-navyDeep/40"
+                >
+                  <span className="text-manor-gold font-mono text-sm w-6 text-right">{i + 2}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-manor-white truncate">{item.song.title}</div>
+                    <div className="text-xs text-manor-offwhite/60 truncate">
+                      {item.song.artist} · {sourceLabel(item)}
+                      {item.song.isExplicit && (
+                        <span className="ml-1 px-1.5 py-0.5 bg-manor-grayMid rounded text-[10px]">E</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-manor-offwhite/50 hidden md:inline">{fmtTime(item.song.durationSec)}</span>
+                  <button
+                    onClick={() => removeQueued(item.id)}
+                    className="text-manor-offwhite/50 hover:text-manor-danger px-2 py-1"
+                    title="Remove from queue"
+                  >
+                    ⏏
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        {/* SEARCH + BROWSE */}
         <section className="card">
-          <div className="text-xs uppercase tracking-wider text-manor-cream/50 mb-2">Decade</div>
-          <div className="flex flex-wrap gap-1">
-            <Chip active={decade === null} onClick={() => setDecade(null)}>All</Chip>
+          <div className="text-xs uppercase tracking-wider text-manor-offwhite/50 mb-3">Library</div>
+
+          <div className="grid md:grid-cols-[1fr_auto] gap-3 mb-3">
+            <input
+              className="input"
+              placeholder="Search title, artist, or album…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select
+              className="input md:w-56"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value} className="bg-manor-navy">{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-2">
+            <Chip active={!genre && !decade && !bpm} onClick={() => { setGenre(null); setDecade(null); setBpm(null); }}>
+              All
+            </Chip>
+            {genres.map((g) => (
+              <Chip key={g} active={genre === g} onClick={() => setGenre(genre === g ? null : g)}>
+                {g}
+              </Chip>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mb-2">
             {DECADES.map((d) => (
-              <Chip
-                key={d.label}
-                active={decade?.min === d.min}
-                onClick={() => setDecade(d)}
-              >
+              <Chip key={d.label} active={decade?.label === d.label} onClick={() => setDecade(decade?.label === d.label ? null : d)}>
                 {d.label}
               </Chip>
             ))}
           </div>
-        </section>
-      </aside>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {BPM_RANGES.map((b) => (
+              <Chip key={b.label} active={bpm?.label === b.label} onClick={() => setBpm(bpm?.label === b.label ? null : b)}>
+                {b.label}
+              </Chip>
+            ))}
+          </div>
 
-      <section>
-        <input
-          className="input mb-3"
-          placeholder="Search title or artist…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+          <div className="text-xs text-manor-offwhite/40 mb-2">
+            {searching ? 'Searching…' : `${results.length} song${results.length === 1 ? '' : 's'}`}
+          </div>
 
-        <ul className="space-y-2">
-          {results.map((s) => (
-            <li key={s.id} className="card flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-manor-cream truncate">{s.title}</div>
-                <div className="text-xs text-manor-cream/60 truncate">
-                  {s.artist}
-                  {s.genre ? ` · ${s.genre}` : ''}
-                  {s.year ? ` · ${s.year}` : ''}
-                  {s.isExplicit && <span className="ml-2 px-1.5 py-0.5 bg-manor-line rounded text-[10px]">E</span>}
-                  {s.hasVideo && <span className="ml-1 px-1.5 py-0.5 bg-manor-tealDark text-manor-ink rounded text-[10px]">VIDEO</span>}
+          <ul className="space-y-1">
+            {results.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-manor-navyDeep/40"
+              >
+                <CoverPlaceholder song={s} compact />
+                <div className="min-w-0 flex-1">
+                  <div className="text-manor-white truncate">{s.title}</div>
+                  <div className="text-xs text-manor-offwhite/60 truncate">
+                    {s.artist} · {metaLine(s)}
+                    {s.isExplicit && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-manor-grayMid rounded text-[10px]">E</span>
+                    )}
+                    {s.hasVideo && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-manor-gold/70 text-manor-navyDeep rounded text-[10px]">
+                        VIDEO
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <button onClick={() => queue(s.id, false)} className="btn-primary px-3 py-2 text-sm">Queue</button>
-              <button onClick={() => queue(s.id, true)} className="btn-ghost px-3 py-2 text-sm" title="Background station (skipped if customer queue fills)">
-                Station
-              </button>
-              <button onClick={() => block(s.id, s.title)} className="btn-danger px-3 py-2 text-sm" title="Hide from customers and stations">
-                Block
-              </button>
-            </li>
-          ))}
-          {results.length === 0 && (
-            <li className="text-manor-cream/50 text-sm">No matches.</li>
-          )}
-        </ul>
-      </section>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => playNow(s.id, s.title)}
+                    className="px-2.5 py-1.5 rounded-lg bg-manor-gold text-manor-navyDeep text-xs font-semibold hover:bg-manor-goldDeep"
+                    title="Skip current track and play this immediately"
+                  >
+                    ▶ Now
+                  </button>
+                  <button
+                    onClick={() => playNext(s.id, s.title)}
+                    className="px-2.5 py-1.5 rounded-lg bg-manor-navyMid text-manor-white text-xs font-semibold border border-manor-gray hover:bg-manor-navy"
+                    title="Insert after the current track"
+                  >
+                    ⏭ Next
+                  </button>
+                  <button
+                    onClick={() => addToQueue(s.id, s.title)}
+                    className="px-2.5 py-1.5 rounded-lg bg-manor-grayMid text-manor-offwhite text-xs font-semibold border border-manor-gray hover:bg-manor-gray"
+                    title="Add to end of queue"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => blockSong(s.id, s.title)}
+                    className="px-2.5 py-1.5 rounded-lg text-manor-offwhite/40 text-xs hover:text-manor-danger"
+                    title="Hide from customers + auto-DJ"
+                  >
+                    ⊘
+                  </button>
+                </div>
+              </li>
+            ))}
+            {!searching && results.length === 0 && (
+              <li className="text-manor-offwhite/50 text-sm">No matches.</li>
+            )}
+          </ul>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function Deck({
+  label,
+  tone,
+  children,
+}: {
+  label: string;
+  tone: 'active' | 'next';
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`relative rounded-2xl p-5 flex gap-4 items-start
+        ${tone === 'active'
+          ? 'bg-manor-navy border-2 border-manor-gold shadow-lg'
+          : 'bg-manor-navyMid border border-manor-gray'
+        }`}
+    >
+      <div className="absolute -top-2.5 left-4 px-2 bg-manor-navyDeep text-[10px] uppercase tracking-[0.2em] text-manor-gold font-bold rounded">
+        {label}
+      </div>
+      {children}
     </div>
   );
 }
 
-function Chip({ active, onClick, children }: {
+function CoverPlaceholder({
+  song,
+  dim,
+  compact,
+}: {
+  song: SongMeta;
+  dim?: boolean;
+  compact?: boolean;
+}) {
+  // Cover art placeholder — we'll wire iTunes lookup behind a /api/cover/[id]
+  // endpoint in a follow-up. Until then, render a gold-on-navy initial badge.
+  const initial = (song.artist || song.title || '?').trim()[0]?.toUpperCase() ?? '?';
+  const sizeClass = compact ? 'w-10 h-10 text-base' : 'w-20 h-20 text-2xl';
+  return (
+    <div
+      className={`${sizeClass} shrink-0 rounded-lg flex items-center justify-center font-black
+        bg-manor-navyDeep border border-manor-gold/40 text-manor-gold
+        ${dim ? 'opacity-70' : ''}`}
+    >
+      {initial}
+    </div>
+  );
+}
+
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -174,11 +545,11 @@ function Chip({ active, onClick, children }: {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-        active
-          ? 'bg-manor-teal text-manor-ink'
-          : 'bg-manor-line text-manor-cream hover:bg-manor-line/70'
-      }`}
+      className={`px-3 py-1.5 rounded-full text-sm transition-colors
+        ${active
+          ? 'bg-manor-gold text-manor-navyDeep font-semibold'
+          : 'bg-manor-grayMid text-manor-offwhite hover:bg-manor-gray border border-manor-gray'
+        }`}
     >
       {children}
     </button>

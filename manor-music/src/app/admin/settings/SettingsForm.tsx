@@ -8,6 +8,7 @@ interface Initial {
   songCooldownMinutes: number;
   artistCooldownMinutes: number;
   customerBlendRatio: number;
+  staffBackgroundUrl: string | null;
 }
 
 export function SettingsForm({ initial }: { initial: Initial }) {
@@ -37,6 +38,23 @@ export function SettingsForm({ initial }: { initial: Initial }) {
         onChange={(n) => setV({ ...v, artistCooldownMinutes: n })} min={0} max={240} />
       <NumberField label="Customer-to-station blend ratio (1 = customer track every N station tracks)" value={v.customerBlendRatio}
         onChange={(n) => setV({ ...v, customerBlendRatio: n })} min={0} max={10} />
+
+      <label className="block">
+        <span className="text-sm text-manor-offwhite/70">
+          Staff DJ console background image URL (optional)
+        </span>
+        <input
+          type="url"
+          className="input mt-1"
+          placeholder="https://example.com/bowling-alley.jpg — leave blank for solid navy"
+          value={v.staffBackgroundUrl ?? ''}
+          onChange={(e) => setV({ ...v, staffBackgroundUrl: e.target.value || null })}
+        />
+        <span className="text-xs text-manor-offwhite/40 mt-1 block">
+          Image is dimmed behind the DJ console UI. Try Unsplash for free venue photos.
+        </span>
+      </label>
+
       <button className="btn-primary w-full" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
     </form>
   );
@@ -51,7 +69,7 @@ function NumberField({ label, value, onChange, min, max }: {
 }) {
   return (
     <label className="block">
-      <span className="text-sm text-manor-cream/70">{label}</span>
+      <span className="text-sm text-manor-offwhite/70">{label}</span>
       <input type="number" className="input mt-1" value={value} min={min} max={max}
         onChange={(e) => onChange(parseInt(e.target.value || '0', 10))} />
     </label>

@@ -10,7 +10,12 @@ export async function GET(req: NextRequest) {
   const minYear = s.get('minYear');
   const maxYear = s.get('maxYear');
 
-  const where: Parameters<typeof db.song.findMany>[0] = { where: { blockedAt: null } };
+  const where: Parameters<typeof db.song.findMany>[0] = {
+    where: {
+      blockedAt: null,
+      filePath: { not: { startsWith: '__missing:' } },
+    },
+  };
   if (q.length >= 2) {
     (where.where as any).OR = [
       { title: { contains: q, mode: 'insensitive' } },

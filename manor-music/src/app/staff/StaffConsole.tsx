@@ -375,7 +375,23 @@ export function StaffConsole({ genres }: { genres: string[] }) {
                 </div>
               </>
             ) : (
-              <div className="text-manor-offwhite/50 text-center w-full">Nothing playing right now.</div>
+              <div className="text-center w-full py-4">
+                <div className="text-manor-offwhite/50 mb-3">Nothing playing right now.</div>
+                {isPaused && (
+                  <div className="space-y-2">
+                    <div className="text-manor-danger font-bold animate-pulse">⏸ Playback is PAUSED</div>
+                    <button onClick={togglePause} className="btn-primary">
+                      ▶ Resume playback
+                    </button>
+                  </div>
+                )}
+                {!isPaused && upNext && (
+                  <div className="text-xs text-manor-offwhite/40">
+                    Player should pick up "{upNext.song.title}" within a few seconds.
+                    If it doesn't, the SER5 player service may need a restart.
+                  </div>
+                )}
+              </div>
             )}
           </Deck>
 
@@ -405,8 +421,42 @@ export function StaffConsole({ genres }: { genres: string[] }) {
           </Deck>
         </div>
 
-        {/* PLAYBACK BAR */}
+        {/* PLAYBACK BAR — always visible, even when Now Playing is empty.
+            This is the source of truth for play/pause/skip so staff can resume
+            from a paused state even before any song is queued. */}
         <section className="card mb-4 bg-manor-grayMid/70 space-y-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={togglePause}
+              className={`px-4 py-2 rounded-lg font-semibold shrink-0 ${
+                isPaused
+                  ? 'bg-manor-gold text-manor-navyDeep animate-pulse'
+                  : 'bg-manor-navyDeep text-manor-white border border-manor-gray'
+              }`}
+            >
+              {isPaused ? '▶ Resume' : '⏸ Pause'}
+            </button>
+            <button
+              onClick={skip}
+              className="px-4 py-2 rounded-lg bg-manor-navyDeep text-manor-white border border-manor-gray font-semibold shrink-0"
+            >
+              ⏭ Skip
+            </button>
+            <div className="text-xs uppercase tracking-wider text-manor-offwhite/50 ml-2 shrink-0">
+              State
+            </div>
+            <div
+              className={`text-sm font-bold tracking-wide ${
+                isPaused ? 'text-manor-danger' : 'text-manor-gold'
+              }`}
+            >
+              {isPaused ? '⏸ PAUSED' : '▶ PLAYING'}
+            </div>
+            <div className="ml-auto text-xs text-manor-offwhite/50 whitespace-nowrap">
+              Auto-DJ: <span className="text-manor-gold">{state.activeStation?.name ?? 'off'}</span>
+            </div>
+          </div>
+
           <div className="flex items-center gap-4">
             <span className="text-xs uppercase tracking-wider text-manor-offwhite/50 w-16">Volume</span>
             <input
@@ -418,9 +468,6 @@ export function StaffConsole({ genres }: { genres: string[] }) {
               className="flex-1 accent-manor-gold"
             />
             <span className="text-manor-gold font-mono w-10 text-right">{state.playback.volume}</span>
-            <div className="ml-4 text-xs text-manor-offwhite/50 whitespace-nowrap">
-              Auto-DJ: <span className="text-manor-gold">{state.activeStation?.name ?? 'off'}</span>
-            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">

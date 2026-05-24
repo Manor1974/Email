@@ -143,7 +143,7 @@ pdf.set_text_color(*WHITE)
 pdf.cell(0, 7, "Manor Lanes / WNY Social Sports  -  150 Grand Island Blvd", new_x="LMARGIN", new_y="NEXT")
 pdf.set_x(12)
 pdf.set_font("Helvetica", "I", 9)
-pdf.cell(0, 6, "Rev. 2  -  UDB-Switch (wireless-uplink) architecture", new_x="LMARGIN", new_y="NEXT")
+pdf.cell(0, 6, "Rev. 3  -  UDB-Switch architecture, with distances + full device specs", new_x="LMARGIN", new_y="NEXT")
 
 pdf.set_xy(12, 78)
 pdf.set_text_color(*BLACK)
@@ -483,9 +483,62 @@ with pdf.table(col_widths=(120, 40), text_align=("LEFT","RIGHT"), first_row_as_h
                  ("Headroom on 185W budget", "very large")]:
         r = t.row(); r.cell(a); r.cell(b)
 
+# --------------------------------------------------------------------------- DISTANCES
+pdf.add_page()
+pdf.h1("7.  Distances, Cabling & Power Schedule")
+pdf.set_font("Helvetica", "I", 8.5); pdf.set_text_color(*GREY)
+pdf.multi_cell(0, 4.5, "Court/area dimensions are from the site CAD. Link distances marked EST. are "
+    "approximate - measure pole-to-pole on site (laser or wheel) and record in the right column before "
+    "ordering cable. Confirm clear line-of-sight at mount height for each wireless uplink.",
+    new_x="LMARGIN", new_y="NEXT"); pdf.set_text_color(*BLACK)
+
+pdf.h2("Court & area dimensions (from CAD)")
+pdf.set_font("Helvetica", "", 9)
+with pdf.table(col_widths=(92, 68), first_row_as_headings=True, line_height=5.2, text_align="LEFT") as t:
+    h = t.row(); h.cell("Feature"); h.cell("Dimension")
+    for a, b in [("Court 1 / 2 / 3 playing surface (each)", "29'6\" x 59'1\" (~30 x 60 ft)"),
+                 ("Courts 1 & 2 fenced area", "100'0\" x 90'0\""),
+                 ("Court 3 fenced area", "61'0\" x 89'6\""),
+                 ("Perimeter light poles", "~20 ft"),
+                 ("Center pole (new, 2 lights)", "20 ft - power present")]:
+        r = t.row(); r.cell(a); r.cell(b)
+
+pdf.ln(1)
+pdf.h2("Link & cable-run schedule")
+pdf.set_font("Helvetica", "", 8.5)
+with pdf.table(col_widths=(54, 40, 40, 26), first_row_as_headings=True, line_height=4.8, text_align="LEFT") as t:
+    h = t.row()
+    for c in ["Segment", "Type", "Est. distance", "Measured"]:
+        h.cell(c)
+    for r in [("Rack -> building U6 #1", "Wired Cat6", "In building (short)", "____"),
+              ("Building U6 #1 -> center pole", "WIRELESS uplink", "~130 ft (owner)", "____"),
+              ("Center pole -> Court 3 pole", "WIRELESS relay", "~100-150 ft EST", "____"),
+              ("Center pole UDB -> each camera", "Wired patch", "~15-30 ft", "____"),
+              ("Center pole UDB -> U6 #2", "Wired patch", "~10-20 ft", "____"),
+              ("Court 3 UDB -> camera", "Wired patch", "~15-30 ft", "____"),
+              ("Court 3 UDB -> U6 #3", "Wired patch", "~10-20 ft", "____")]:
+        row = t.row()
+        for c in r:
+            row.cell(c)
+
+pdf.ln(1)
+pdf.h2("Power schedule (electrician)")
+pdf.bullet("Center pole: tap existing pole light circuit (120V) -> 210W adapter (in enclosure) -> UDB-Switch.")
+pdf.bullet("Court 3 pole: tap existing pole light circuit (120V) -> 210W adapter (in enclosure) -> UDB-Switch.")
+pdf.bullet("Building U6 #1: no separate power - PoE from a rack switch port.")
+pdf.bullet("Cold note: the 210W adapter is rated 0-40 C (32-104 F). Courts are seasonal, but if the gear "
+           "stays powered through deep winter use a sealed enclosure (gear self-heat helps) and monitor.")
+
+pdf.ln(1)
+pdf.h2("Cable & accessory takeoff")
+pdf.bullet("Outdoor/UV or direct-burial shielded Cat6 for the pole patch runs + the building-AP run.")
+pdf.bullet("ETH-SP-Pro surge protector on the building-AP copper run (and any copper entering a structure).")
+pdf.bullet("Stainless band-clamp pole mounts (3 cameras + 2 pole APs); building mast/standoff for U6 #1.")
+pdf.bullet("Weatherproof glands, drip loops, UV zip ties, dielectric grease, outdoor RJ45 ends + tester.")
+
 # --------------------------------------------------------------------------- COMMISSIONING
 pdf.add_page()
-pdf.h1("7.  Commissioning & Acceptance Checklist")
+pdf.h1("8.  Commissioning & Acceptance Checklist")
 
 def check(txt):
     pdf.set_font("Helvetica", "", 9.8); pdf.set_text_color(*BLACK)
@@ -523,6 +576,64 @@ pdf.set_font("Helvetica", "", 10); pdf.set_text_color(*BLACK)
 pdf.ln(6); pdf.cell(95, 6, "Installer: ______________________________"); pdf.cell(0, 6, "Date: ________________", new_x="LMARGIN", new_y="NEXT")
 pdf.ln(6); pdf.cell(0, 6, "Notes: __________________________________________________________________", new_x="LMARGIN", new_y="NEXT")
 pdf.ln(4); pdf.cell(0, 6, "________________________________________________________________________________", new_x="LMARGIN", new_y="NEXT")
+
+# --------------------------------------------------------------------------- SPECS APPENDIX
+pdf.add_page()
+pdf.h1("9.  Device Specifications (Appendix)")
+pdf.set_font("Helvetica", "I", 8.5); pdf.set_text_color(*GREY)
+pdf.cell(0, 5, "Key manufacturer specs for each device. Verify current values on ui.com before purchase.",
+         new_x="LMARGIN", new_y="NEXT")
+pdf.set_text_color(*BLACK)
+
+
+def spec(title, lines):
+    pdf.h2(title)
+    for k, v in lines:
+        pdf.set_x(14)
+        pdf.set_font("Helvetica", "B", 8.8); pdf.set_text_color(*NAVY); pdf.cell(40, 4.6, k)
+        pdf.set_font("Helvetica", "", 8.8); pdf.set_text_color(*BLACK)
+        pdf.multi_cell(0, 4.6, v, new_x="LMARGIN", new_y="NEXT")
+
+
+spec("Device Bridge Switch (UDB-Switch-US) - NEW x2", [
+    ("Ports", "1x 10 GbE + 7x 2.5 GbE; PoE+ output"),
+    ("PoE budget", "35W (incl. 60W adapter) / up to 185W (with 210W adapter)"),
+    ("Wireless uplink", "WiFi 7, 4 streams; up to 5.8 Gbps (6 GHz) / 4.3 Gbps (5 GHz)"),
+    ("Power", "54V DC; 60W adapter included, 210W optional"),
+    ("Size / class", "212.9 x 113 x 32.5 mm; desktop/wall (indoor-class - enclose outdoors)"),
+])
+spec("Access Point U6 Mesh Pro (U6-MESH-PRO) - REUSE x2 + NEW x1", [
+    ("WiFi", "WiFi 6; 5 GHz 2x2 to 2.4 Gbps, 2.4 GHz 2x2 to 573.5 Mbps; 8 dBi"),
+    ("Ports / power", "2x GbE RJ45; PoE (48V adapter incl. or PoE switch); 9W max"),
+    ("Environment", "IPX6 weatherproof; -30 to 60 C; 250+ clients"),
+    ("Size", "343.2 x 181.2 x 60.2 mm"),
+])
+spec("Camera G6 Bullet (UVC-G6-Bullet-B) - NEW x3", [
+    ("Imaging", "8MP 4K (3840 x 2160), 1/1.8\" sensor, 30 FPS, AI detection"),
+    ("Field of view", "109.9 H / 56.7 V / 134.1 D (degrees)"),
+    ("Night vision", "IR up to 30 m (98 ft); IR cut filter"),
+    ("Power", "PoE 37-57V DC; 9.9W max"),
+    ("Environment", "IP66; -20 to 50 C"),
+])
+spec("AC Adapter 210W (UACC-Adapter-AC-210W) - NEW x2", [
+    ("Input / output", "100-240V AC in; 54V DC out, 3.90A, 210W"),
+    ("Operating temp", "0 to 40 C (32-104 F) - cold-weather caveat"),
+    ("Size", "190 x 86 x 26 mm; C14 inlet, 1.5 m DC cable"),
+])
+spec("Ethernet Surge Protection Outdoor (UACC-ETH-SP-Pro) - NEW x2-4", [
+    ("Protection", "Passive, 20kA discharge; data to 10 Gbps; 60W PoE++ passthrough"),
+    ("Environment", "IPX5; -30 to 65 C"),
+    ("Size", "91 x 61 x 32.5 mm"),
+])
+spec("Network Video Recorder Pro (UNVR-Pro) - EXISTING", [
+    ("Storage", "7x 2.5/3.5\" bays; SATA to 24TB each; up to 168TB raw; RAID"),
+    ("Capacity", "Up to 24x 4K cameras (~60 days) or 70 HD"),
+    ("Ports / form", "1x 10G SFP+, 1x GbE RJ45; 2U rackmount"),
+])
+spec("Apple TV 4K (bar viewer) - NEW x1 (alternative to Viewport)", [
+    ("Use", "Runs official UniFi Protect tvOS app; HDMI to bar TV"),
+    ("Network", "Ethernet (higher model) or WiFi; approx. $129"),
+])
 
 out = "/home/user/Email/Manor-Lanes-Courts-Install-Report.pdf"
 pdf.output(out)

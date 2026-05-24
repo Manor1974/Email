@@ -143,7 +143,7 @@ pdf.set_text_color(*WHITE)
 pdf.cell(0, 7, "Manor Lanes / WNY Social Sports  -  150 Grand Island Blvd", new_x="LMARGIN", new_y="NEXT")
 pdf.set_x(12)
 pdf.set_font("Helvetica", "I", 9)
-pdf.cell(0, 6, "Rev. 4  -  UDB-Switch architecture; courts + patio cameras; distances + full specs", new_x="LMARGIN", new_y="NEXT")
+pdf.cell(0, 6, "Rev. 5  -  UDB-Switch architecture; courts + patio cameras; measured distances + full specs", new_x="LMARGIN", new_y="NEXT")
 
 pdf.set_xy(12, 78)
 pdf.set_text_color(*BLACK)
@@ -177,8 +177,8 @@ pdf.multi_cell(0, 5,
     "the Court 3 UDB-Switch links (relay) to the center-pole AP. The three U6 Mesh Pro APs are "
     "repositioned from the failed concrete-wall mounting onto poles, where coverage radiates over the "
     "sand. Court cameras: 3 fixed G6 Bullets (one per court). Patio cameras (wired to the rack, not via "
-    "the backhaul): 1 G6 PTZ for roaming zoom across both patios + 2 G6 Pro Bullets for fixed security. "
-    "The AI PTZ and a G6 180 remain on the parking lot.",
+    "the backhaul): 1 G6 PTZ (pole-mounted - covers the 2nd patio + zoom/auto-track) + 2 G6 Bullets on "
+    "the main-patio back wall. The AI PTZ and a G6 180 remain on the parking lot.",
     new_x="LMARGIN", new_y="NEXT")
 
 # --------------------------------------------------------------------------- BACKGROUND
@@ -344,8 +344,8 @@ pdf.h2("How the wireless backhaul works")
 pdf.bullet("The UDB-Switch is a WiFi-7 switch with a built-in wireless uplink: it joins the UniFi WiFi "
            "over the air and provides PoE locally - so no cable runs out to the poles.")
 pdf.bullet("Center pole UDB-Switch uplinks to the building U6 Mesh Pro #1 (~130 ft, line-of-sight).")
-pdf.bullet("Court 3 UDB-Switch uplinks (relay) to the center-pole U6 Mesh Pro #2 (Court 3 sits behind "
-           "Court 2, so it chains through the elevated center pole).")
+pdf.bullet("Court 3 UDB-Switch uplinks (relay) to the center-pole U6 Mesh Pro #2 - measured 110 ft, well "
+           "within range (Court 3 sits behind Court 2, so it chains through the elevated center pole).")
 pdf.bullet("WiFi-7 uplink to a WiFi-6 AP runs at WiFi-6 rates - hundreds of Mbps, far above the "
            "~50-80 Mbps needed for 3x 4K cameras + AP clients.")
 pdf.bullet("Each UDB-Switch is powered by a 210W adapter (up to 185W PoE) - ample for cameras + AP.")
@@ -370,9 +370,9 @@ with pdf.table(col_widths=(22, 32, 40, 22, 36),
         ("Court 3 pole", "UDB-Switch (in NEMA enclosure)", "Wireless uplink to center-pole U6 #2", "~6 ft (reach)", "AC from pole light circuit + 210W adapter"),
         ("Court 3 pole", "G6 Bullet", "Aim down length of Court 3", "~18-20 ft", "PoE from UDB-Switch"),
         ("Court 3 pole", "U6 Mesh Pro #3 (new)", "Radiate over Court 3", "~15-18 ft", "PoE from UDB-Switch"),
-        ("Patio (central)", "G6 PTZ (new)", "Pan/zoom both patios; AI auto-track; reuse 180 drop", "existing", "Wired PoE+ from rack"),
-        ("P1 patio", "G6 Pro Bullet (new)", "Fixed varifocal - continuous detail", "~10-12 ft", "Wired PoE+ from building"),
-        ("P2 patio", "G6 Pro Bullet (new)", "Fixed varifocal - continuous detail", "~10-12 ft", "Wired PoE+ over existing P2 cable"),
+        ("Patio (pole)", "G6 PTZ (new)", "Pole-mount; sight line to 2nd patio; zoom/auto-track", "on pole", "Wired PoE+ (reuse 180 drop)"),
+        ("Main patio", "G6 Bullet (new)", "Back wall, LEFT - covers main patio", "~10-12 ft", "Wired PoE from building"),
+        ("Main patio", "G6 Bullet (new)", "Back wall, RIGHT - covers main patio", "~10-12 ft", "Wired PoE from building"),
         ("Parking lot", "G6 180 + AI PTZ Industrial", "No change - stay on lot", "existing", "existing"),
     ]
     for r in rows:
@@ -428,18 +428,19 @@ with pdf.table(col_widths=(74, 14, 28, 26), first_row_as_headings=True, line_hei
     h = t.row()
     for c in ["Item (UniFi SKU)", "Qty", "Unit", "Line"]:
         h.cell(c)
-    for r in [("Camera G6 PTZ (UVC-G6-PTZ) - roaming zoom, both patios", "1", "$399", "$399"),
-              ("Camera G6 Pro Bullet (UVC-G6-Pro-Bullet) - 1 per patio", "2", "$479", "$958")]:
+    for r in [("Camera G6 PTZ (UVC-G6-PTZ) - pole; 2nd patio + zoom", "1", "$399", "$399"),
+              ("Camera G6 Bullet (UVC-G6-Bullet) - 2 on main-patio wall", "2", "$199", "$398")]:
         row = t.row()
         for c in r:
             row.cell(c)
 pdf.set_font("Helvetica", "B", 10); pdf.set_text_color(*NAVY)
-pdf.cell(0, 6, "Patio cameras subtotal:  approx. $1,357", new_x="LMARGIN", new_y="NEXT")
+pdf.cell(0, 6, "Patio cameras subtotal:  approx. $797  (saved ~$560 vs G6 Pro Bullets)", new_x="LMARGIN", new_y="NEXT")
 pdf.set_font("Helvetica", "", 9); pdf.set_text_color(*GREY)
-pdf.multi_cell(0, 4.4, "All three patio cameras wire directly to rack PoE+ (P1 from the building; P2 over "
-    "the existing pulled cable; the PTZ reuses the current 180 drop) - NOT through the court UDB-Switch "
-    "backhaul. Relocate or retire the patio-facing G6 180 (no zoom). The G6 PTZ dual-lens keeps a wide "
-    "view while it zooms/auto-tracks; the 2 Pro Bullets give continuous detailed security per patio.",
+pdf.multi_cell(0, 4.4, "All three patio cameras wire directly to rack PoE+ (the 2 bullets from the building "
+    "back wall; the PTZ reuses the current 180 drop) - NOT through the court UDB-Switch backhaul. Relocate "
+    "or retire the patio-facing G6 180 (no zoom). The 2 G6 Bullets cover the MAIN patio (mounted either side "
+    "of the back wall); the G6 PTZ provides zoom/auto-track and the sight line to the 2nd patio. If you later "
+    "want continuous fixed coverage of the 2nd patio, add one more G6 Bullet there.",
     new_x="LMARGIN", new_y="NEXT")
 
 pdf.ln(2)
@@ -539,7 +540,7 @@ with pdf.table(col_widths=(54, 40, 40, 26), first_row_as_headings=True, line_hei
         h.cell(c)
     for r in [("Rack -> building U6 #1", "Wired Cat6", "In building (short)", "____"),
               ("Building U6 #1 -> center pole", "WIRELESS uplink", "~130 ft (owner)", "____"),
-              ("Center pole -> Court 3 pole", "WIRELESS relay", "~100-150 ft EST", "____"),
+              ("Center pole -> Court 3 pole", "WIRELESS relay", "110 ft (measured)", "DONE"),
               ("Center pole UDB -> each camera", "Wired patch", "~15-30 ft", "____"),
               ("Center pole UDB -> U6 #2", "Wired patch", "~10-20 ft", "____"),
               ("Court 3 UDB -> camera", "Wired patch", "~15-30 ft", "____"),
@@ -635,7 +636,7 @@ spec("Access Point U6 Mesh Pro (U6-MESH-PRO) - REUSE x2 + NEW x1", [
     ("Environment", "IPX6 weatherproof; -30 to 60 C; 250+ clients"),
     ("Size", "343.2 x 181.2 x 60.2 mm"),
 ])
-spec("Camera G6 Bullet (UVC-G6-Bullet-B) - NEW x3", [
+spec("Camera G6 Bullet (UVC-G6-Bullet-B) - NEW x5 (3 courts + 2 patio)", [
     ("Imaging", "8MP 4K (3840 x 2160), 1/1.8\" sensor, 30 FPS, AI detection"),
     ("Field of view", "109.9 H / 56.7 V / 134.1 D (degrees)"),
     ("Night vision", "IR up to 30 m (98 ft); IR cut filter"),
@@ -647,13 +648,6 @@ spec("Camera G6 PTZ (UVC-G6-PTZ) - NEW x1 (patio)", [
     ("Zoom / motion", "10x hybrid (4x optical + 2.5x digital); 350 pan / 100 tilt"),
     ("AI", "Auto-tracking of people/vehicles; full smart detections"),
     ("Power / env", "PoE+; outdoor-rated IP dome; approx. $399"),
-])
-spec("Camera G6 Pro Bullet (UVC-G6-Pro-Bullet) - NEW x2 (patio)", [
-    ("Imaging", "4K, 1/1.2\" sensor, 30 FPS"),
-    ("Lens / zoom", "5.9-13.8 mm varifocal, 2.36x optical; 113.8-45.5 H FOV"),
-    ("Night vision", "IR 40 m (131 ft); up to 60 m with Vision Enhancer"),
-    ("Power", "PoE+; up to 15W"),
-    ("Environment", "IP66; approx. -20 to 50 C (verify)"),
 ])
 spec("AC Adapter 210W (UACC-Adapter-AC-210W) - NEW x2", [
     ("Input / output", "100-240V AC in; 54V DC out, 3.90A, 210W"),

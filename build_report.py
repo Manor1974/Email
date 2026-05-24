@@ -276,8 +276,8 @@ arrow(pdf, cpx - 1, cpy + 1, c3x + 1, c3y - 1, ORANGE, dashed=True, w=0.6)
 callout(pdf, fx + 44, fy + 92, 62,
         ["UDB-Switch (210W) - WiFi uplink",
          "U6 Mesh Pro #2 (C1/C2 coverage)",
-         "G6 Pro Bullet -> main court",
-         "G6 Bullet -> other court"],
+         "G6 Bullet -> Court 1",
+         "G6 Bullet -> Court 2"],
         "CENTER POLE HUB (20', power)")
 callout(pdf, fx + 8, fy + 130, 42,
         ["UDB-Switch (210W) - WiFi uplink", "G6 Bullet -> court", "U6 Mesh Pro #3"],
@@ -321,7 +321,7 @@ pdf.set_xy(58, cy + 1.5); pdf.set_font("Helvetica", "B", 9); pdf.set_text_color(
 pdf.cell(100, 4.5, "CENTER POLE HUB  (20 ft, power present)", align="C", new_x="LMARGIN", new_y="NEXT")
 pdf.set_x(58); pdf.set_font("Helvetica", "", 7.4); pdf.set_text_color(*BLACK)
 for s in ["UDB-Switch (210W adapter) - wireless uplink to building U6 #1",
-          "U6 Mesh Pro #2  |  G6 Pro Bullet (main court)  |  G6 Bullet (other court)"]:
+          "U6 Mesh Pro #2  |  G6 Bullet (Court 1)  |  G6 Bullet (Court 2)"]:
     pdf.set_x(58); pdf.cell(100, 4, s, align="C", new_x="LMARGIN", new_y="NEXT")
 arrow(pdf, 30, ty + 16, 100, cy, ORANGE, dashed=True, w=0.7)
 pdf.set_xy(34, ty + 26); pdf.set_font("Helvetica", "B", 7); pdf.set_text_color(*ORANGE)
@@ -362,8 +362,8 @@ with pdf.table(col_widths=(22, 32, 40, 22, 36),
     rows = [
         ("Building", "U6 Mesh Pro #1 (relocated)", "Mast/standoff OFF concrete; LoS to center pole", "Roofline", "Wired PoE from rack switch"),
         ("Center pole", "UDB-Switch (in NEMA enclosure)", "Wireless uplink to building U6 #1", "~6 ft (reach)", "AC from pole light circuit + 210W adapter"),
-        ("Center pole", "G6 Pro Bullet", "Aim down MAIN court (zoom set to fill court)", "~18-20 ft", "PoE from UDB-Switch"),
-        ("Center pole", "G6 Bullet", "Aim down the other court", "~18-20 ft", "PoE from UDB-Switch"),
+        ("Center pole", "G6 Bullet", "Aim down Court 1", "~18-20 ft", "PoE from UDB-Switch"),
+        ("Center pole", "G6 Bullet", "Aim down Court 2", "~18-20 ft", "PoE from UDB-Switch"),
         ("Center pole", "U6 Mesh Pro #2 (relocated)", "Radiate over C1/C2; reaches P1/P2", "~15-18 ft", "PoE from UDB-Switch"),
         ("Court 3 pole", "UDB-Switch (in NEMA enclosure)", "Wireless uplink to center-pole U6 #2", "~6 ft (reach)", "AC from pole light circuit + 210W adapter"),
         ("Court 3 pole", "G6 Bullet", "Aim down length of Court 3", "~18-20 ft", "PoE from UDB-Switch"),
@@ -378,9 +378,9 @@ with pdf.table(col_widths=(22, 32, 40, 22, 36),
 pdf.ln(2)
 pdf.set_font("Helvetica", "I", 8.5); pdf.set_text_color(*GREY)
 pdf.multi_cell(0, 4, "Camera aiming: mount each bullet at one END of its court and aim down the 60 ft "
-    "length for full coverage and best pixel density. The G6 Pro Bullet's optical zoom lets you fill "
-    "the frame with the main court (best detail + low light) and doubles as the special-games detail "
-    "cam. Do not use the G6 180 for court detail.", new_x="LMARGIN", new_y="NEXT")
+    "length for full coverage and best pixel density. Do not use the G6 180 for court detail. "
+    "(A G6 Pro Bullet could be added later on a court for varifocal zoom / special-games detail.)",
+    new_x="LMARGIN", new_y="NEXT")
 
 # --------------------------------------------------------------------------- BOM
 pdf.add_page()
@@ -396,8 +396,7 @@ with pdf.table(col_widths=(74, 14, 28, 26), text_align=("LEFT","CENTER","RIGHT",
         ("Device Bridge Switch (UDB-Switch-US)", "2", "$299", "$598"),
         ("AC Adapter 210W (UACC-Adapter-AC-210W)", "2", "$79", "$158"),
         ("Access Point U6 Mesh Pro (new; + relocate 2 owned)", "1", "$179", "$179"),
-        ("Camera G6 Pro Bullet (UVC-G6-Pro-Bullet-B) - main court", "1", "$479", "$479"),
-        ("Camera G6 Bullet (UVC-G6-Bullet-B) - other 2 courts", "2", "$199", "$398"),
+        ("Camera G6 Bullet (UVC-G6-Bullet-B) - one per court", "3", "$199", "$597"),
         ("Outdoor NEMA enclosure sized for UDB-Switch", "2", "~$90", "~$180"),
         ("Ethernet Surge Protection Outdoor (UACC-ETH-SP-Pro)", "2-4", "$19", "$38-76"),
         ("Pole mounts / building mast + short patch cables", "1 lot", "~$120", "~$120"),
@@ -408,14 +407,22 @@ with pdf.table(col_widths=(74, 14, 28, 26), text_align=("LEFT","CENTER","RIGHT",
             row.cell(c)
 pdf.ln(1)
 pdf.set_font("Helvetica", "B", 10); pdf.set_text_color(*NAVY)
-pdf.cell(0, 6, "Estimated net new spend:  approx. $2,150 - $2,200", new_x="LMARGIN", new_y="NEXT")
+pdf.cell(0, 6, "Estimated net new spend:  approx. $1,850 - $1,950 (+ bar-TV viewer, below)", new_x="LMARGIN", new_y="NEXT")
 
 pdf.ln(1)
 pdf.set_font("Helvetica", "", 9); pdf.set_text_color(*GREY)
-pdf.multi_cell(0, 4.4, "Camera option: substitute 3x G6 Bullet (~$597 total) for the 1 Pro + 2 regular mix "
-    "(~$877) if budget-driven - regular bullets give good full-court coverage; the Pro adds zoom detail "
-    "and low-light on the main court. Note: tariff/memory surcharges from the UniFi store are extra.",
-    new_x="LMARGIN", new_y="NEXT")
+pdf.multi_cell(0, 4.4, "Cameras: 3x G6 Bullet selected (one per court) for full coverage. A G6 Pro Bullet "
+    "(varifocal) can be added later on a court for zoom detail / special-games footage. Tariff and "
+    "memory surcharges from the UniFi store are extra.", new_x="LMARGIN", new_y="NEXT")
+
+pdf.ln(2)
+pdf.h2("Customer viewing - bar TV (UniFi Protect on a screen)")
+pdf.set_font("Helvetica", "", 9.5); pdf.set_text_color(*BLACK)
+pdf.bullet("Existing Protect Viewport is in use in the office (all-camera wall) - not available for the bar.")
+pdf.bullet("In stock now: Apple TV 4K (~$129) + the official UniFi Protect tvOS app - shows a live court "
+           "view on the bar TV. Use the 3rd-party Streamie app if you want a curated courts-only layout.")
+pdf.bullet("Or buy a 2nd Protect Viewport when back in stock (native, full custom Live View support).")
+pdf.bullet("In Protect, build a Live View with the 3 court bullets (audio muted), set as default, leave on.")
 
 pdf.ln(2)
 pdf.h2("Removed from earlier cart (not needed)")
@@ -471,7 +478,7 @@ pdf.h2("PoE budget per pole (UDB-Switch, 185W available with 210W adapter)")
 pdf.set_font("Helvetica", "", 9)
 with pdf.table(col_widths=(120, 40), text_align=("LEFT","RIGHT"), first_row_as_headings=True, line_height=5.2) as t:
     hr = t.row(); hr.cell("Pole load"); hr.cell("Approx draw")
-    for a, b in [("Center pole: G6 Pro + G6 Bullet + U6 Mesh Pro", "~32 W"),
+    for a, b in [("Center pole: 2x G6 Bullet + U6 Mesh Pro", "~27 W"),
                  ("Court 3: G6 Bullet + U6 Mesh Pro", "~20 W"),
                  ("Headroom on 185W budget", "very large")]:
         r = t.row(); r.cell(a); r.cell(b)
@@ -499,7 +506,8 @@ check("No dead pocket on P1/P2 (existing P2 cable can feed an added AP if needed
 check("Roaming: a phone walks court-to-court without dropping.")
 pdf.h2("Cameras (UniFi Protect)")
 check("All 3 court bullets online and recording to NVR Pro.")
-check("Each bullet frames its full court; G6 Pro zoom set to fill the main court.")
+check("Each bullet frames its full court end-to-end.")
+check("Bar TV: Apple TV (or Viewport) shows the courts Live View; audio muted; always-on.")
 check("Night check: image usable under the Musco court lights.")
 check("Retention check: 16 TB HDD holds target days with the added cameras (add HDD if short).")
 pdf.h2("Power & weatherproofing")

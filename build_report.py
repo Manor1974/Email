@@ -143,7 +143,7 @@ pdf.set_text_color(*WHITE)
 pdf.cell(0, 7, "Manor Lanes / WNY Social Sports  -  150 Grand Island Blvd", new_x="LMARGIN", new_y="NEXT")
 pdf.set_x(12)
 pdf.set_font("Helvetica", "I", 9)
-pdf.cell(0, 6, "Rev. 3  -  UDB-Switch architecture, with distances + full device specs", new_x="LMARGIN", new_y="NEXT")
+pdf.cell(0, 6, "Rev. 4  -  UDB-Switch architecture; courts + patio cameras; distances + full specs", new_x="LMARGIN", new_y="NEXT")
 
 pdf.set_xy(12, 78)
 pdf.set_text_color(*BLACK)
@@ -176,7 +176,9 @@ pdf.multi_cell(0, 5,
     "(off the concrete wall) is the wired uplink anchor; the center-pole UDB-Switch links to it, and "
     "the Court 3 UDB-Switch links (relay) to the center-pole AP. The three U6 Mesh Pro APs are "
     "repositioned from the failed concrete-wall mounting onto poles, where coverage radiates over the "
-    "sand. Cameras: 3 fixed bullets (one per court); the AI PTZ and a G6 180 remain on the parking lot.",
+    "sand. Court cameras: 3 fixed G6 Bullets (one per court). Patio cameras (wired to the rack, not via "
+    "the backhaul): 1 G6 PTZ for roaming zoom across both patios + 2 G6 Pro Bullets for fixed security. "
+    "The AI PTZ and a G6 180 remain on the parking lot.",
     new_x="LMARGIN", new_y="NEXT")
 
 # --------------------------------------------------------------------------- BACKGROUND
@@ -368,6 +370,9 @@ with pdf.table(col_widths=(22, 32, 40, 22, 36),
         ("Court 3 pole", "UDB-Switch (in NEMA enclosure)", "Wireless uplink to center-pole U6 #2", "~6 ft (reach)", "AC from pole light circuit + 210W adapter"),
         ("Court 3 pole", "G6 Bullet", "Aim down length of Court 3", "~18-20 ft", "PoE from UDB-Switch"),
         ("Court 3 pole", "U6 Mesh Pro #3 (new)", "Radiate over Court 3", "~15-18 ft", "PoE from UDB-Switch"),
+        ("Patio (central)", "G6 PTZ (new)", "Pan/zoom both patios; AI auto-track; reuse 180 drop", "existing", "Wired PoE+ from rack"),
+        ("P1 patio", "G6 Pro Bullet (new)", "Fixed varifocal - continuous detail", "~10-12 ft", "Wired PoE+ from building"),
+        ("P2 patio", "G6 Pro Bullet (new)", "Fixed varifocal - continuous detail", "~10-12 ft", "Wired PoE+ over existing P2 cable"),
         ("Parking lot", "G6 180 + AI PTZ Industrial", "No change - stay on lot", "existing", "existing"),
     ]
     for r in rows:
@@ -414,6 +419,28 @@ pdf.set_font("Helvetica", "", 9); pdf.set_text_color(*GREY)
 pdf.multi_cell(0, 4.4, "Cameras: 3x G6 Bullet selected (one per court) for full coverage. A G6 Pro Bullet "
     "(varifocal) can be added later on a court for zoom detail / special-games footage. Tariff and "
     "memory surcharges from the UniFi store are extra.", new_x="LMARGIN", new_y="NEXT")
+
+pdf.ln(2)
+pdf.h2("Patio security cameras (added)")
+pdf.set_font("Helvetica", "", 9)
+with pdf.table(col_widths=(74, 14, 28, 26), first_row_as_headings=True, line_height=5.4,
+               text_align=("LEFT", "CENTER", "RIGHT", "RIGHT")) as t:
+    h = t.row()
+    for c in ["Item (UniFi SKU)", "Qty", "Unit", "Line"]:
+        h.cell(c)
+    for r in [("Camera G6 PTZ (UVC-G6-PTZ) - roaming zoom, both patios", "1", "$399", "$399"),
+              ("Camera G6 Pro Bullet (UVC-G6-Pro-Bullet) - 1 per patio", "2", "$479", "$958")]:
+        row = t.row()
+        for c in r:
+            row.cell(c)
+pdf.set_font("Helvetica", "B", 10); pdf.set_text_color(*NAVY)
+pdf.cell(0, 6, "Patio cameras subtotal:  approx. $1,357", new_x="LMARGIN", new_y="NEXT")
+pdf.set_font("Helvetica", "", 9); pdf.set_text_color(*GREY)
+pdf.multi_cell(0, 4.4, "All three patio cameras wire directly to rack PoE+ (P1 from the building; P2 over "
+    "the existing pulled cable; the PTZ reuses the current 180 drop) - NOT through the court UDB-Switch "
+    "backhaul. Relocate or retire the patio-facing G6 180 (no zoom). The G6 PTZ dual-lens keeps a wide "
+    "view while it zooms/auto-tracks; the 2 Pro Bullets give continuous detailed security per patio.",
+    new_x="LMARGIN", new_y="NEXT")
 
 pdf.ln(2)
 pdf.h2("Customer viewing - bar TV (UniFi Protect on a screen)")
@@ -614,6 +641,19 @@ spec("Camera G6 Bullet (UVC-G6-Bullet-B) - NEW x3", [
     ("Night vision", "IR up to 30 m (98 ft); IR cut filter"),
     ("Power", "PoE 37-57V DC; 9.9W max"),
     ("Environment", "IP66; -20 to 50 C"),
+])
+spec("Camera G6 PTZ (UVC-G6-PTZ) - NEW x1 (patio)", [
+    ("Imaging", "4K, 1/1.8\" 8MP sensor, 30 FPS; dual-lens (wide + telephoto)"),
+    ("Zoom / motion", "10x hybrid (4x optical + 2.5x digital); 350 pan / 100 tilt"),
+    ("AI", "Auto-tracking of people/vehicles; full smart detections"),
+    ("Power / env", "PoE+; outdoor-rated IP dome; approx. $399"),
+])
+spec("Camera G6 Pro Bullet (UVC-G6-Pro-Bullet) - NEW x2 (patio)", [
+    ("Imaging", "4K, 1/1.2\" sensor, 30 FPS"),
+    ("Lens / zoom", "5.9-13.8 mm varifocal, 2.36x optical; 113.8-45.5 H FOV"),
+    ("Night vision", "IR 40 m (131 ft); up to 60 m with Vision Enhancer"),
+    ("Power", "PoE+; up to 15W"),
+    ("Environment", "IP66; approx. -20 to 50 C (verify)"),
 ])
 spec("AC Adapter 210W (UACC-Adapter-AC-210W) - NEW x2", [
     ("Input / output", "100-240V AC in; 54V DC out, 3.90A, 210W"),
